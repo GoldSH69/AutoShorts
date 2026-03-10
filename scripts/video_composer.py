@@ -4,6 +4,7 @@ FFmpeg 기반 영상 합성
 """
 
 import os
+import math
 import subprocess
 import json
 from pathlib import Path
@@ -79,7 +80,7 @@ class VideoComposer:
             )
             
             if result.returncode != 0:
-                logger.error(f"FFmpeg 오류:\n{result.stderr[-1000:]}")
+                logger.error(f"FFmpeg 오류:\n{result.stderr[-2000:]}")
                 raise Exception(f"FFmpeg 실패: {result.returncode}")
             
             # 결과 확인
@@ -109,10 +110,8 @@ class VideoComposer:
             try:
                 bgm = AudioSegment.from_file(bgm_path)
                 
-                # BGM 볼륨 조절
+                # BGM 볼륨 조절 (dB 변환)
                 bgm_volume = self.bgm_config.get('volume', 0.08)
-                # dB로 변환 (0.08 ≈ -22dB)
-                import math
                 if bgm_volume > 0:
                     volume_db = 20 * math.log10(bgm_volume)
                 else:
@@ -123,7 +122,6 @@ class VideoComposer:
                 target_ms = int(target_duration * 1000)
                 
                 if len(bgm) < target_ms:
-                    # 루프
                     loops = (target_ms // len(bgm)) + 1
                     bgm = bgm * loops
                 
@@ -134,13 +132,128 @@ class VideoComposer:
                 fade_out = self.bgm_config.get('fade_out_ms', 2000)
                 bgm = bgm.fade_in(fade_in).fade_out(fade_out)
                 
-                # BGM 길이에 맞게 나레이션 오버레이
-                if len(bgm) > len(narration):
-                    # 나레이션을 BGM 위에 오버레이
+                # 나레이션을 BGM 위에 오버레이
+                if len(bgm) >= len(narration):
                     mixed = bgm.overlay(narration)
                 else:
-                    # 나레이션이 더 긴 경우
-                    mixed = narration.overlay(bgm)
+                    # 나레이션이 더 긴 경우 BGM을 패딩
+                    silence_pad = AudioSegment.silent(duration=len(narration) - len(bgm))
+                    bgm_padded = bgm + silence_pad
+                    mixed = bgm_padded.overlay(narration)
                 
                 mixed.export(output_path, format='mp3', bitrate='192k')
-                logger.info(f"오디오 믹싱 완료 (BGM 포함, {len(mixed)/1000:.1
+                logger.info(f"오디오 믹싱 완료 (BGM 포함, {len(mixed)/1000:.1f}초)")
+                return
+                
+            except Exception as e:
+                logger.warning(f"BGM 믹싱 실패, 나레이션만 사용: {e}")
+        
+        # BGM 없이 나레이션만
+        narration.export(output_path, format='mp3', bitrate='192k')
+        logger.info(f"오디오 준비 완료 (나레이션만, {len(narration)/1000:.1f}초)")
+    
+    def _build_ffmpeg_command(self, background_path, audio_path, 
+                              subtitle_path, output_path, target_duration):
+        """FFmpeg 명령 빌드"""
+        
+        # 배경 영상 길이 확인
+        bg_duration = self._get_duration(background_path)
+        
+        # 배경이 짧으면 루프
+        loop_count = 1
+        if bg_duration < target_duration:
+            loop_count = int(target_duration / bg_duration) + 1
+        
+        # 자막 파일 경로 (FFmpeg용 이스케이프)
+        sub_path_escaped = str(subtitle_path).replace('\\', '/').replace(':', '\\:')
+        
+        # 어두운 오버레이 값
+        opacity_hex = format(int(self.bg_opacity * 255), '02x')
+        
+        cmd = [
+            'ffmpeg', '-y',
+        ]
+        
+        # 입력: 배경 영상 (루프)
+        if loop_count > 1:
+            cmd.extend([
+                '-stream_loop', str(loop_count - 1),
+            ])
+        cmd.extend([
+            '-i', str(background_path),
+        ])
+        
+        # 입력: 오디오
+        cmd.extend([
+            '-i', str(audio_path),
+        ])
+        
+        # 필터 체인
+        filter_parts = []
+        
+        # 1. 배경 영상 스케일 + 크롭 (세로 9:16)
+        filter_parts.append(
+            f"[0:v]scale={self.width}:{self.height}:force_original_aspect_ratio=increase,"
+            f"crop={self.width}:{self.height},"
+            f"setsar=1[scaled]"
+        )
+        
+        # 2. 어두운 오버레이
+        filter_parts.append(
+            f"[scaled]drawbox=0:0:{self.width}:{self.height}:"
+            f"color=black@{self.bg_opacity}:t=fill[darkened]"
+        )
+        
+        # 3. 자막 합성
+        filter_parts.append(
+            f"[darkened]ass='{sub_path_escaped}'[subbed]"
+        )
+        
+        filter_complex = ';'.join(filter_parts)
+        
+        cmd.extend([
+            '-filter_complex', filter_complex,
+            '-map', '[subbed]',
+            '-map', '1:a',
+            '-t', str(target_duration),
+            '-r', str(self.fps),
+            '-c:v', 'libx264',
+            '-preset', 'fast',
+            '-crf', '23',
+            '-pix_fmt', 'yuv420p',
+            '-c:a', 'aac',
+            '-b:a', '128k',
+            '-ar', '44100',
+            '-movflags', '+faststart',
+            '-shortest',
+            str(output_path),
+        ])
+        
+        return cmd
+    
+    def _get_duration(self, file_path):
+        """미디어 파일 길이 (초)"""
+        try:
+            cmd = [
+                'ffprobe',
+                '-v', 'quiet',
+                '-show_entries', 'format=duration',
+                '-of', 'json',
+                str(file_path),
+            ]
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+            data = json.loads(result.stdout)
+            duration = float(data['format']['duration'])
+            return duration
+        except Exception as e:
+            logger.warning(f"길이 확인 실패: {e}, 기본값 30초 사용")
+            return 30.0
+    
+    def _cleanup(self, files):
+        """임시 파일 삭제"""
+        for f in files:
+            try:
+                if Path(f).exists():
+                    os.remove(f)
+            except Exception:
+                pass
