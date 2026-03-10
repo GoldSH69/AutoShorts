@@ -1,0 +1,101 @@
+name: 🔧 Manual Trigger (Test)
+
+on:
+  workflow_dispatch:
+    inputs:
+      language:
+        description: '언어 선택'
+        required: true
+        default: 'ko'
+        type: choice
+        options:
+          - ko
+          - en
+      category:
+        description: '카테고리'
+        required: true
+        default: 'dark'
+        type: choice
+        options:
+          - auto
+          - quiz
+          - success
+          - brain
+          - dark
+          - hack
+          - mbti
+          - relationship
+      dry_run:
+        description: '테스트 모드 (업로드 안함)'
+        required: false
+        default: true
+        type: boolean
+      debug:
+        description: '디버그 모드'
+        required: false
+        default: true
+        type: boolean
+
+env:
+  GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+  PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
+  PIXABAY_API_KEY: ${{ secrets.PIXABAY_API_KEY }}
+  TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+  TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+
+jobs:
+  test-generate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: 📥 Checkout
+        uses: actions/checkout@v4
+
+      - name: 🐍 Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: 📦 Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: 🔤 Install fonts
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq fonts-nanum fonts-nanum-coding
+          fc-cache -fv
+
+      - name: 📁 Prepare
+        run: mkdir -p output history
+
+      - name: 🧪 Test Generate
+        run: |
+          cd scripts
+          
+          ARGS="--language ${{ github.event.inputs.language }}"
+          ARGS="$ARGS --config ../config/config.yml"
+          ARGS="$ARGS --category ${{ github.event.inputs.category }}"
+          
+          if [ "${{ github.event.inputs.dry_run }}" = "true" ]; then
+            ARGS="$ARGS --skip-upload"
+          fi
+          
+          if [ "${{ github.event.inputs.debug }}" = "true" ]; then
+            ARGS="$ARGS --debug"
+          fi
+          
+          echo "🧪 테스트 실행: python main.py $ARGS"
+          python main.py $ARGS
+
+      - name: 💾 Save artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-short-${{ github.run_number }}
+          path: |
+            output/*
+          retention-days: 3
