@@ -1,0 +1,161 @@
+name: 🇰🇷 Daily Korean Short
+
+on:
+  schedule:
+    # 매일 UTC 07:00 = 한국시간 16:00
+    - cron: '0 7 * * *'
+  
+  workflow_dispatch:
+    inputs:
+      category_override:
+        description: '카테고리 강제 지정'
+        required: false
+        default: 'auto'
+        type: choice
+        options:
+          - auto
+          - quiz
+          - success
+          - brain
+          - dark
+          - hack
+          - mbti
+          - relationship
+      weekday_override:
+        description: '요일 강제 지정 (0=월~6=일, 빈값=자동)'
+        required: false
+        default: ''
+      skip_upload:
+        description: 'YouTube 업로드 건너뛰기'
+        required: false
+        default: false
+        type: boolean
+      debug:
+        description: '디버그 모드'
+        required: false
+        default: false
+        type: boolean
+
+env:
+  GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+  PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
+  PIXABAY_API_KEY: ${{ secrets.PIXABAY_API_KEY }}
+  TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+  TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+  YOUTUBE_CLIENT_ID: ${{ secrets.YOUTUBE_CLIENT_ID }}
+  YOUTUBE_CLIENT_SECRET: ${{ secrets.YOUTUBE_CLIENT_SECRET }}
+  YOUTUBE_REFRESH_TOKEN: ${{ secrets.YOUTUBE_REFRESH_TOKEN }}
+
+jobs:
+  generate-short:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      # ─── 체크아웃 ───
+      - name: 📥 Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 1
+
+      # ─── Python 설정 ───
+      - name: 🐍 Setup Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      # ─── 의존성 설치 ───
+      - name: 📦 Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements.txt
+
+      # ─── 한글 폰트 설치 ───
+      - name: 🔤 Install Korean fonts
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq fonts-nanum fonts-nanum-coding
+          fc-cache -fv
+          echo "✅ 한글 폰트 설치 완료"
+          fc-list | grep -i nanum | head -5
+
+      # ─── FFmpeg 확인 ───
+      - name: 🎬 Verify FFmpeg
+        run: |
+          ffmpeg -version | head -1
+          ffprobe -version | head -1
+          echo "✅ FFmpeg 확인 완료"
+
+      # ─── 디렉토리 준비 ───
+      - name: 📁 Prepare directories
+        run: |
+          mkdir -p output
+          mkdir -p history
+          echo "✅ 디렉토리 준비 완료"
+
+      # ─── 영상 생성 ───
+      - name: 🧠 Generate Short Video
+        id: generate
+        run: |
+          cd scripts
+          
+          ARGS="--language ko"
+          ARGS="$ARGS --config ../config/config.yml"
+          
+          # 카테고리 오버라이드
+          CATEGORY="${{ github.event.inputs.category_override || 'auto' }}"
+          ARGS="$ARGS --category $CATEGORY"
+          
+          # 요일 오버라이드
+          WEEKDAY="${{ github.event.inputs.weekday_override }}"
+          if [ -n "$WEEKDAY" ]; then
+            ARGS="$ARGS --weekday $WEEKDAY"
+          fi
+          
+          # 업로드 건너뛰기
+          if [ "${{ github.event.inputs.skip_upload }}" = "true" ]; then
+            ARGS="$ARGS --skip-upload"
+          fi
+          
+          # 디버그
+          if [ "${{ github.event.inputs.debug }}" = "true" ]; then
+            ARGS="$ARGS --debug"
+          fi
+          
+          echo "🚀 실행: python main.py $ARGS"
+          python main.py $ARGS
+
+      # ─── 히스토리 커밋 ───
+      - name: 📝 Update history
+        if: success()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add history/
+          git diff --staged --quiet || git commit -m "📝 [KO] Update history $(date +%Y-%m-%d)"
+          git push || echo "⚠️ Push 실패 (충돌 가능)"
+
+      # ─── 아티팩트 저장 ───
+      - name: 💾 Upload video artifact
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: korean-short-${{ github.run_number }}
+          path: output/*.mp4
+          retention-days: 7
+
+      # ─── 실패 시 텔레그램 알림 ───
+      - name: 🚨 Notify failure
+        if: failure()
+        run: |
+          cd scripts
+          python telegram_notifier.py \
+            --status failure \
+            --config ../config/config.yml \
+            --language ko \
+            --error "GitHub Actions 워크플로우 실패. 로그를 확인하세요."
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
