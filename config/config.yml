@@ -1,0 +1,203 @@
+# ============================================
+# 뇌를 깨우는 30초 - 메인 설정 파일
+# ============================================
+
+# ─── 채널 정보 ───
+channel:
+  ko:
+    name: "뇌를 깨우는 30초"
+    enabled: true
+    language: "ko"
+    tts_lang: "ko"
+    description_footer: |
+      🧠 매일 30초, 당신의 뇌를 업그레이드하세요!
+      📌 구독하고 알림 설정!
+      #뇌를깨우는30초 #심리학 #자기계발 #shorts
+  en:
+    name: "30-Second Brain Hack"
+    enabled: false
+    language: "en"
+    tts_lang: "en"
+    description_footer: |
+      🧠 Upgrade your brain in 30 seconds!
+      📌 Subscribe and turn on notifications!
+      #30SecondBrainHack #psychology #selfimprovement #shorts
+
+# ─── 영상 설정 ───
+video:
+  duration: 30
+  max_duration: 58
+  width: 1080
+  height: 1920
+  fps: 30
+  format: "mp4"
+  background_opacity: 0.4
+
+# ─── 요일별 카테고리 (0=월, 6=일) ───
+categories:
+  0:
+    id: "quiz"
+    name_ko: "심리학 퀴즈/놀라운 사실"
+    name_en: "Psychology Quiz & Facts"
+    emoji: "💡"
+    hashtags_ko: "#심리학 #심리퀴즈 #뇌과학 #shorts #심리 #심리학퀴즈"
+    hashtags_en: "#psychology #psychologyfacts #quiz #shorts #brain"
+    search_terms:
+      - "brain thinking"
+      - "question mark"
+      - "mind puzzle"
+      - "abstract thought"
+  1:
+    id: "success"
+    name_ko: "성공한 사람들의 심리 패턴"
+    name_en: "Psychology of Successful People"
+    emoji: "🏆"
+    hashtags_ko: "#성공 #심리패턴 #자기계발 #shorts #동기부여 #성공습관"
+    hashtags_en: "#success #mindset #motivation #shorts #winners"
+    search_terms:
+      - "success business"
+      - "achievement"
+      - "luxury lifestyle"
+      - "determined person"
+  2:
+    id: "brain"
+    name_ko: "뇌과학 기반 생산성 팁"
+    name_en: "Brain Science Productivity Tips"
+    emoji: "🧬"
+    hashtags_ko: "#뇌과학 #생산성 #집중력 #shorts #브레인 #생산성팁"
+    hashtags_en: "#neuroscience #productivity #braintips #shorts #focus"
+    search_terms:
+      - "brain neuroscience"
+      - "technology futuristic"
+      - "focus concentration"
+      - "science laboratory"
+  3:
+    id: "dark"
+    name_ko: "다크 심리학 - 설득과 영향력"
+    name_en: "Dark Psychology - Persuasion & Influence"
+    emoji: "🖤"
+    hashtags_ko: "#다크심리학 #설득 #영향력 #shorts #심리조종 #심리학"
+    hashtags_en: "#darkpsychology #persuasion #influence #shorts #manipulation"
+    search_terms:
+      - "shadow dark mystery"
+      - "chess strategy"
+      - "dark silhouette"
+      - "mysterious person"
+  4:
+    id: "hack"
+    name_ko: "자기계발 심리 해킹"
+    name_en: "Self-Improvement Mind Hacks"
+    emoji: "🚀"
+    hashtags_ko: "#자기계발 #심리해킹 #마인드셋 #shorts #성장 #습관"
+    hashtags_en: "#selfimprovement #mindhack #growth #shorts #habits"
+    search_terms:
+      - "motivation sunrise"
+      - "person running"
+      - "growth plant"
+      - "morning routine"
+  5:
+    id: "mbti"
+    name_ko: "MBTI 성격 유형 심리학"
+    name_en: "MBTI Personality Psychology"
+    emoji: "🎭"
+    hashtags_ko: "#MBTI #성격유형 #심리 #shorts #INTJ #ENFP #성격테스트"
+    hashtags_en: "#MBTI #personality #psychology #shorts #personalitytype"
+    search_terms:
+      - "people crowd diverse"
+      - "personality face"
+      - "colorful abstract"
+      - "social interaction"
+  6:
+    id: "relationship"
+    name_ko: "관계의 심리학"
+    name_en: "Psychology of Relationships"
+    emoji: "💕"
+    hashtags_ko: "#연애심리 #관계 #심리학 #shorts #연애 #대인관계"
+    hashtags_en: "#relationships #dating #lovepsychology #shorts #signals"
+    search_terms:
+      - "couple relationship"
+      - "people talking"
+      - "social connection"
+      - "romantic silhouette"
+
+# ─── Gemini API ───
+gemini:
+  model: "gemini-2.5-flash"
+  fallback_models:
+    - "gemini-2.0-flash"
+    - "gemini-1.5-flash"
+  temperature: 0.9
+  max_output_tokens: 2048
+  retry_count: 3
+  retry_delay: 5
+
+# ─── TTS ───
+tts:
+  engine: "gtts"
+  speed_factor: 1.05
+  silence_between_sentences_ms: 300
+  ko:
+    lang: "ko"
+    tld: "co.kr"
+  en:
+    lang: "en"
+    tld: "com"
+
+# ─── 배경 영상 ───
+background:
+  primary_source: "pexels"
+  fallback_source: "pixabay"
+  orientation: "portrait"
+  min_duration: 10
+  per_page: 15
+  pexels:
+    base_url: "https://api.pexels.com/videos/search"
+  pixabay:
+    base_url: "https://pixabay.com/api/videos/"
+
+# ─── BGM ───
+bgm:
+  enabled: true
+  volume: 0.08
+  fade_in_ms: 1000
+  fade_out_ms: 2000
+  directory: "assets/music"
+
+# ─── 자막 ───
+subtitle:
+  enabled: true
+  font_name: "NanumGothic"
+  font_size: 52
+  font_color: "&H00FFFFFF"
+  outline_color: "&H00000000"
+  outline_width: 3
+  shadow_offset: 1
+  margin_v: 400
+  max_chars_per_line_ko: 14
+  max_chars_per_line_en: 30
+  alignment: 5
+
+# ─── 업로드 ───
+upload:
+  youtube:
+    enabled: false
+    privacy: "public"
+    made_for_kids: false
+    category_id: "27"
+    default_language: "ko"
+  telegram:
+    enabled: true
+    send_video: true
+    max_caption_length: 1024
+
+# ─── 히스토리 ───
+history:
+  enabled: true
+  max_records: 500
+  file: "history/generated_topics.json"
+
+# ─── 스케줄 ───
+schedule:
+  ko_cron: "0 7 * * *"
+  en_cron: "0 14 * * *"
+  timezone: "Asia/Seoul"
