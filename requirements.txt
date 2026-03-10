@@ -1,0 +1,33 @@
+# ============================================
+# 뇌를 깨우는 30초 - Dependencies
+# ============================================
+
+# Gemini API
+google-generativeai>=0.8.0
+
+# TTS
+gTTS>=2.5.3
+
+# Audio processing
+pydub>=0.25.1
+
+# HTTP requests
+requests>=2.31.0
+
+# Image processing
+Pillow>=10.0.0
+
+# YouTube Upload
+google-auth>=2.23.0
+google-auth-oauthlib>=1.1.0
+google-auth-httplib2>=0.2.0
+google-api-python-client>=2.100.0
+
+# Telegram
+python-telegram-bot>=20.0
+
+# Config
+PyYAML>=6.0.1
+
+# Utils
+python-dateutil>=2.8.2
