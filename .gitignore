@@ -1,0 +1,43 @@
+# ─── Python ───
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.env
+.venv
+env/
+venv/
+*.egg-info/
+dist/
+build/
+
+# ─── Output (생성된 영상) ───
+output/*.mp4
+output/*.mp3
+output/*.ass
+output/*.wav
+output/mixed_audio.*
+!output/.gitkeep
+
+# ─── IDE ───
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# ─── OS ───
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ─── Secrets ───
+*.json.bak
+credentials.json
+token.json
+client_secret*.json
+
+# ─── Temp ───
+tmp/
+temp/
+*.tmp
