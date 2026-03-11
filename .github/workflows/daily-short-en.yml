@@ -108,7 +108,7 @@ jobs:
         with:
           name: english-short-${{ github.run_number }}
           path: output/*.mp4
-          retention-days: 30
+          retention-days: 7
 
       - name: 🚨 Notify failure
         if: failure()
