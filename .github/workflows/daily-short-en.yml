@@ -67,7 +67,28 @@ jobs:
           sudo apt-get update -qq
           sudo apt-get install -y -qq fonts-nanum
           fc-cache -fv
-
+          
+      # ─── FFmpeg 설치 및 확인 ───
+      - name: 🎬 Install and verify FFmpeg
+        run: |
+          # 명시적 설치 (이미 있어도 안전)
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq ffmpeg
+          
+          # 경로 확인
+          which ffmpeg
+          which ffprobe
+          
+          # 버전 확인
+          ffmpeg -version | head -1
+          ffprobe -version | head -1
+          
+          # PATH에 있는지 확인
+          echo "ffmpeg path: $(which ffmpeg)"
+          echo "ffprobe path: $(which ffprobe)"
+          
+          echo "✅ FFmpeg 설치 완료"
+          
       - name: 📁 Prepare directories
         run: |
           mkdir -p output
