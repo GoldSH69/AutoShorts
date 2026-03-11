@@ -191,18 +191,18 @@ subtitle:
 # ─── 업로드 ───
 upload:
   youtube:
-    enabled: true
-    privacy: "unlisted"
+    enabled: true              # false → true ✅
+    privacy: "public"          # public / private / unlisted
     made_for_kids: false
-    category_id: "27"
+    category_id: "27"          # Education
     default_language: "ko"
-    notify_subscribers: true
-    
+    title_format: "{emoji} {title} | {channel_name}"
+    notify_subscribers: true   # 구독자 알림
   telegram:
     enabled: true
-    send_video: true
+    send_video: true           # 자동 업로드 후에도 텔레그램으로 확인
     max_caption_length: 1024
-
+    
 # ─── 히스토리 ───
 history:
   enabled: true
