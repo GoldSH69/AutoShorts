@@ -204,28 +204,44 @@ def main():
             logger.info("-" * 40)
             
             if config.is_youtube_upload_enabled():
-                uploader = YouTubeUploader(config)
-                metadata = generate_upload_metadata(
-                    script_data=script_data,
-                    config=config,
-                    language=language,
-                    weekday=weekday,
-                )
-                
-                upload_result = uploader.upload(
-                    video_path=output_video_path,
-                    title=metadata['title'],
-                    description=metadata['description'],
-                    tags=metadata['tags'],
-                    language=language,
-                )
-                
-                if upload_result:
-                    logger.info(f"  업로드 성공: {upload_result['url']}")
-                else:
-                    logger.warning("  업로드 실패")
+                try:
+                    uploader = YouTubeUploader(config)
+                    
+                    if uploader.enabled:
+                        metadata = generate_upload_metadata(
+                            script_data=script_data,
+                            config=config,
+                            language=language,
+                            weekday=weekday,
+                        )
+                        
+                        logger.info(f"  제목: {metadata['title']}")
+                        logger.info(f"  태그: {len(metadata['tags'])}개")
+                        
+                        upload_result = uploader.upload(
+                            video_path=output_video_path,
+                            title=metadata['title'],
+                            description=metadata['description'],
+                            tags=metadata['tags'],
+                            language=language,
+                        )
+                        
+                        if upload_result:
+                            logger.info(f"  ✅ 업로드 성공: {upload_result['url']}")
+                        else:
+                            logger.warning("  ⚠️ 업로드 실패 (영상은 생성됨)")
+                    else:
+                        logger.warning("  ⚠️ YouTube 인증 실패, 업로드 건너뜀")
+                        
+                except Exception as e:
+                    logger.error(f"  ❌ 업로드 오류: {e}")
+                    logger.info("  영상은 정상 생성됨, 수동 업로드 가능")
+                    # 업로드 실패해도 전체 프로세스는 계속
             else:
                 logger.info("  YouTube 업로드 비활성화 (수동 업로드 모드)")
+        else:
+            logger.info("")
+            logger.info("⏭️ Step 7: YouTube 업로드 건너뜀 (skip-upload/dry-run)")
         
         # ─── Step 8: 텔레그램 알림 ───
         if not args.skip_telegram:
