@@ -142,7 +142,7 @@ jobs:
             output/*.mp4
             output/*.mp3
             output/*.ass
-          retention-days: 30
+          retention-days: 7
 
       - name: 🚨 Notify failure
         if: failure()
