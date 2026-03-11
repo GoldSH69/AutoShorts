@@ -22,8 +22,10 @@
 ## 이전에 다룬 주제들
 {previous_topics}
 
-## 출력 형식 (반드시 아래 JSON 형식으로만 출력하세요)
-{{
+## 출력 형식
+반드시 아래와 같은 JSON 형식으로만 출력하세요. JSON 외에 다른 텍스트는 절대 포함하지 마세요.
+
+{
   "title": "영상 제목 (최대 30자, MBTI 관련 호기심)",
   "hook": "첫 3초 후킹 문장",
   "body": "본문 (MBTI 심리학 정보)",
@@ -32,10 +34,10 @@
   "description": "유튜브 설명란 텍스트 (50자 이내)",
   "search_keyword": "배경영상 검색용 영어 키워드 1개",
   "subtitle_segments": [
-    {{"text": "자막 세그먼트 1", "duration": 3}},
-    {{"text": "자막 세그먼트 2", "duration": 4}},
-    {{"text": "자막 세그먼트 3", "duration": 5}},
-    {{"text": "자막 세그먼트 4", "duration": 4}},
-    {{"text": "자막 세그먼트 5", "duration": 3}}
+    {"text": "자막 세그먼트 1", "duration": 3},
+    {"text": "자막 세그먼트 2", "duration": 4},
+    {"text": "자막 세그먼트 3", "duration": 5},
+    {"text": "자막 세그먼트 4", "duration": 4},
+    {"text": "자막 세그먼트 5", "duration": 3}
   ]
-}}
+}
