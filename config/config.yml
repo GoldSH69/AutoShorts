@@ -192,7 +192,7 @@ subtitle:
 upload:
   youtube:
     enabled: true              # false → true ✅
-    privacy: "public"          # public / private / unlisted
+    privacy: "unlisted"        # public / private / unlisted
     made_for_kids: false
     category_id: "27"          # Education
     default_language: "ko"
