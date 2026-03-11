@@ -112,31 +112,94 @@ def split_text_for_subtitle(text, language='ko', max_chars=None):
 
 # ─── JSON 처리 ───
 def safe_json_loads(text):
-    """안전한 JSON 파싱 (Gemini 응답에서 JSON 추출)"""
+    """안전한 JSON 파싱 (Gemini 응답에서 JSON 추출) - 강화 버전"""
     if not text:
+        logger.warning("JSON 파싱: 빈 텍스트")
         return None
     
-    # 마크다운 코드블록 제거
-    text = text.strip()
-    if text.startswith('```json'):
-        text = text[7:]
-    elif text.startswith('```'):
-        text = text[3:]
-    if text.endswith('```'):
-        text = text[:-3]
+    original_text = text
     text = text.strip()
     
-    # JSON 객체 추출 시도
+    # ─── 1단계: 마크다운 코드블록 제거 ───
+    # ```json ... ``` 패턴
+    code_block_pattern = r'```(?:json)?\s*\n?(.*?)\n?\s*```'
+    code_matches = re.findall(code_block_pattern, text, re.DOTALL)
+    if code_matches:
+        text = code_matches[0].strip()
+        logger.info("JSON 파싱: 코드블록에서 추출")
+    
+    # ─── 2단계: 직접 파싱 시도 ───
     try:
-        return json.loads(text)
+        result = json.loads(text)
+        logger.info("JSON 파싱: 직접 파싱 성공")
+        return result
     except json.JSONDecodeError:
-        # { } 사이 추출 시도
-        match = re.search(r'\{.*\}', text, re.DOTALL)
-        if match:
+        pass
+    
+    # ─── 3단계: { } 블록 추출 시도 ───
+    # 가장 바깥쪽 { } 찾기
+    brace_depth = 0
+    start_idx = -1
+    end_idx = -1
+    
+    for i, char in enumerate(text):
+        if char == '{':
+            if brace_depth == 0:
+                start_idx = i
+            brace_depth += 1
+        elif char == '}':
+            brace_depth -= 1
+            if brace_depth == 0 and start_idx >= 0:
+                end_idx = i + 1
+                break
+    
+    if start_idx >= 0 and end_idx > start_idx:
+        json_candidate = text[start_idx:end_idx]
+        try:
+            result = json.loads(json_candidate)
+            logger.info("JSON 파싱: 중괄호 추출 성공")
+            return result
+        except json.JSONDecodeError:
+            # ─── 4단계: 이중 중괄호 수정 시도 ───
+            # {{ → { , }} → } 치환
+            fixed = json_candidate
+            fixed = re.sub(r'\{\{', '{', fixed)
+            fixed = re.sub(r'\}\}', '}', fixed)
             try:
-                return json.loads(match.group())
+                result = json.loads(fixed)
+                logger.info("JSON 파싱: 이중 중괄호 수정 후 성공")
+                return result
             except json.JSONDecodeError:
                 pass
+    
+    # ─── 5단계: 줄바꿈/특수문자 정리 후 재시도 ───
+    cleaned = text
+    # 제어 문자 제거
+    cleaned = re.sub(r'[\x00-\x1f\x7f]', ' ', cleaned)
+    # 연속 공백 정리
+    cleaned = re.sub(r'\s+', ' ', cleaned)
+    
+    # { } 재추출
+    match = re.search(r'\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}', cleaned, re.DOTALL)
+    if match:
+        try:
+            result = json.loads(match.group())
+            logger.info("JSON 파싱: 정리 후 추출 성공")
+            return result
+        except json.JSONDecodeError:
+            pass
+    
+    # ─── 6단계: Gemini thinking 모드 응답 처리 ───
+    # <think>...</think> 블록 제거
+    thinking_removed = re.sub(r'<think>.*?</think>', '', text, flags=re.DOTALL)
+    if thinking_removed != text:
+        logger.info("JSON 파싱: thinking 블록 제거 시도")
+        return safe_json_loads(thinking_removed)
+    
+    # ─── 실패 ───
+    # 디버그용: 원본 응답 앞부분 출력
+    preview = original_text[:500]
+    logger.error(f"JSON 파싱 최종 실패. 응답 미리보기:\n{preview}")
     
     return None
 
