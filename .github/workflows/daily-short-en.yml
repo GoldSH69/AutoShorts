@@ -2,7 +2,6 @@ name: 🇺🇸 Daily English Short
 
 on:
   schedule:
-    # 매일 UTC 14:00 = 미국 동부 10:00 AM
     - cron: '0 14 * * *'
   
   workflow_dispatch:
@@ -28,6 +27,7 @@ on:
         type: boolean
 
 env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
   GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
   PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
   PIXABAY_API_KEY: ${{ secrets.PIXABAY_API_KEY }}
@@ -41,17 +41,14 @@ jobs:
   generate-short:
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    
-    # 영어 채널이 config에서 enabled: true일 때만 실행
-    # 초반에는 이 워크플로우를 disable 상태로 둘 수 있음
 
     steps:
-      - name: 📥 Checkout repository
+      - name: 📥 Checkout
         uses: actions/checkout@v4
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: 🐍 Setup Python 3.11
+      - name: 🐍 Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
@@ -62,44 +59,26 @@ jobs:
           pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: 🔤 Install fonts
+      - name: 🎬 Install FFmpeg
         run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y -qq fonts-nanum
-          fc-cache -fv
-          
-      # ─── FFmpeg 설치 및 확인 ───
-      - name: 🎬 Install and verify FFmpeg
-        run: |
-          # 명시적 설치 (이미 있어도 안전)
           sudo apt-get update -qq
           sudo apt-get install -y -qq ffmpeg
-          
-          # 경로 확인
-          which ffmpeg
-          which ffprobe
-          
-          # 버전 확인
-          ffmpeg -version | head -1
-          ffprobe -version | head -1
-          
-          # PATH에 있는지 확인
-          echo "ffmpeg path: $(which ffmpeg)"
-          echo "ffprobe path: $(which ffprobe)"
-          
-          echo "✅ FFmpeg 설치 완료"
-          
-      - name: 📁 Prepare directories
+          which ffmpeg && which ffprobe
+          echo "✅ FFmpeg OK"
+
+      - name: 🔤 Install fonts
         run: |
-          mkdir -p output
-          mkdir -p history
+          sudo apt-get install -y -qq fonts-nanum
+          fc-cache -fv
+
+      - name: 📁 Prepare
+        run: mkdir -p output history
 
       - name: 🧠 Generate English Short
         run: |
           cd scripts
           
-          ARGS="--language en"
-          ARGS="$ARGS --config ../config/config.yml"
+          ARGS="--language en --config ../config/config.yml"
           
           CATEGORY="${{ github.event.inputs.category_override || 'auto' }}"
           ARGS="$ARGS --category $CATEGORY"
@@ -109,6 +88,10 @@ jobs:
           fi
           
           python main.py $ARGS
+
+      - name: 📋 List generated files
+        if: always()
+        run: ls -la output/ || echo "비어있음"
 
       - name: 📝 Update history
         if: success()
@@ -125,7 +108,7 @@ jobs:
         with:
           name: english-short-${{ github.run_number }}
           path: output/*.mp4
-          retention-days: 7
+          retention-days: 30
 
       - name: 🚨 Notify failure
         if: failure()
@@ -135,4 +118,4 @@ jobs:
             --status failure \
             --config ../config/config.yml \
             --language en \
-            --error "English workflow failed."
+            --error "English workflow failed"
