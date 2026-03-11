@@ -41,15 +41,28 @@ class TelegramNotifier:
         title = script_data.get('title', '제목 없음') if script_data else '제목 없음'
         
         # 업로드 상태
-        if upload_result:
-            upload_status = f"✅ 완료 ({upload_result.get('privacy', '')})"
+        if upload_result and upload_result.get('video_id'):
+            upload_status = f"✅ 자동 업로드 완료 ({upload_result.get('privacy', 'public')})"
             video_url = upload_result.get('url', '')
             link_line = f"🔗 링크: {video_url}"
+        elif self.config.is_youtube_upload_enabled():
+            upload_status = "❌ 업로드 실패 (수동 업로드 필요)"
+            link_line = "📱 Artifacts 또는 아래 영상 파일을 수동 업로드하세요"
         else:
-            upload_status = "⏭️ 수동 업로드 대기"
-            link_line = "📱 텔레그램에서 영상 확인 후 수동 업로드하세요"
+            upload_status = "⏭️ 수동 업로드 모드"
+            link_line = "📱 아래 영상 파일을 YouTube에 업로드하세요"
         
         duration_str = f"{video_duration:.1f}초" if video_duration else "확인 불가"
+        
+        # 업로드 메타데이터 (수동 업로드용)
+        meta_info = ""
+        if not upload_result and script_data:
+            hashtags = self.config.get_category_hashtags(weekday, language)
+            suggested_title = f"{emoji} {title} | {self.config.get_channel_name(language)}"
+            meta_info = f"""
+📋 수동 업로드 시 사용:
+제목: {suggested_title}
+{hashtags}"""
         
         message = f"""✅ [뇌를 깨우는 30초] 영상 생성 완료!
 
@@ -60,7 +73,7 @@ class TelegramNotifier:
 ⏱ 길이: {duration_str}
 📤 업로드: {upload_status}
 {link_line}
-"""
+{meta_info}"""
         
         # 텍스트 메시지 전송
         self._send_message(message)
@@ -68,7 +81,7 @@ class TelegramNotifier:
         # 영상 파일 전송 (옵션)
         if (video_path and Path(video_path).exists() 
             and self.tg_config.get('send_video', True)):
-            self._send_video(video_path, title)
+            self._send_video(video_path, f"{emoji} {title}")
         
         return True
     
