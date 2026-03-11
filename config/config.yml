@@ -122,15 +122,25 @@ categories:
 
 # ─── Gemini API ───
 gemini:
-  model: "gemini-2.5-flash"
+  # 주력 모델: 2.5-flash-lite (thinking 없음, 빠르고 안정적)
+  model: "gemini-2.5-flash-lite"
+  
+  # 백업 모델 (순서대로 시도)
   fallback_models:
-    - "gemini-2.0-flash"
-    - "gemini-1.5-flash"
-    - "gemini-1.5-flash-latest"
+    - "gemini-2.0-flash-lite"
+    - "gemini-flash-lite-latest"
+    - "gemini-2.5-flash"           # thinking 모델 (최후 수단)
+  
+  # 사용 불가 모델 (참고용 메모)
+  # - gemini-1.5-flash: 목록에서 삭제됨
+  # - gemini-1.5-flash-latest: 목록에서 삭제됨
+  # - gemini-2.0-flash: 무료 할당량 0 (불안정)
+  
   temperature: 0.9
-  max_output_tokens: 2048
-  retry_count: 2          # 3→2 (rate limit 절약)
-  retry_delay: 10         # 5→10 (rate limit 여유)
+  max_output_tokens: 8192          # 충분한 응답 공간
+  thinking_budget: 2048            # thinking 모델용 (2.5-flash 백업 시)
+  retry_count: 2
+  retry_delay: 10
 
 # ─── TTS ───
 tts:
