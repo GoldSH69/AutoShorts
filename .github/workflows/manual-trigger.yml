@@ -57,7 +57,7 @@ jobs:
         uses: actions/checkout@v5
 
       - name: 🐍 Setup Python
-        uses: actions/setup-python@v5.6.0
+        uses: actions/setup-python@v5.7.0
         with:
           python-version: '3.11'
           cache: 'pip'
@@ -116,7 +116,7 @@ jobs:
 
       - name: 💾 Save artifact
         if: always()
-        uses: actions/upload-artifact@v4.6.2
+        uses: actions/upload-artifact@v4.6.3
         with:
           name: test-short-${{ github.run_number }}
           path: |
