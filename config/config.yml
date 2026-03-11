@@ -191,11 +191,13 @@ subtitle:
 # ─── 업로드 ───
 upload:
   youtube:
-    enabled: false
-    privacy: "public"
+    enabled: true
+    privacy: "unlisted"
     made_for_kids: false
     category_id: "27"
     default_language: "ko"
+    notify_subscribers: true
+    
   telegram:
     enabled: true
     send_video: true
