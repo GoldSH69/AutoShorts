@@ -68,7 +68,14 @@ jobs:
           sudo apt-get update -qq
           sudo apt-get install -y -qq fonts-nanum fonts-nanum-coding
           fc-cache -fv
-
+          
+      - name: 🎬 Install FFmpeg
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq ffmpeg
+          which ffmpeg && which ffprobe
+          echo "✅ FFmpeg OK"
+          
       - name: 📁 Prepare
         run: mkdir -p output history
 
