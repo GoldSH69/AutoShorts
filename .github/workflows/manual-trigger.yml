@@ -37,6 +37,7 @@ on:
         type: boolean
 
 env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
   GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
   PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
   PIXABAY_API_KEY: ${{ secrets.PIXABAY_API_KEY }}
@@ -63,19 +64,18 @@ jobs:
           pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: 🔤 Install fonts
-        run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y -qq fonts-nanum fonts-nanum-coding
-          fc-cache -fv
-          
       - name: 🎬 Install FFmpeg
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y -qq ffmpeg
           which ffmpeg && which ffprobe
           echo "✅ FFmpeg OK"
-          
+
+      - name: 🔤 Install fonts
+        run: |
+          sudo apt-get install -y -qq fonts-nanum fonts-nanum-coding
+          fc-cache -fv
+
       - name: 📁 Prepare
         run: mkdir -p output history
 
@@ -95,8 +95,21 @@ jobs:
             ARGS="$ARGS --debug"
           fi
           
-          echo "🧪 테스트 실행: python main.py $ARGS"
+          echo "🧪 테스트: python main.py $ARGS"
           python main.py $ARGS
+
+      - name: 📋 List generated files
+        if: always()
+        run: |
+          echo "=== output 폴더 ==="
+          ls -lah output/ 2>/dev/null || echo "비어있음"
+          echo ""
+          echo "=== 파일 상세 ==="
+          for f in output/*; do
+            if [ -f "$f" ]; then
+              echo "$(basename $f): $(du -h $f | cut -f1)"
+            fi
+          done
 
       - name: 💾 Save artifact
         if: always()
@@ -105,4 +118,4 @@ jobs:
           name: test-short-${{ github.run_number }}
           path: |
             output/*
-          retention-days: 3
+          retention-days: 7
