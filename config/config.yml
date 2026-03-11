@@ -126,10 +126,11 @@ gemini:
   fallback_models:
     - "gemini-2.0-flash"
     - "gemini-1.5-flash"
+    - "gemini-1.5-flash-latest"
   temperature: 0.9
   max_output_tokens: 2048
-  retry_count: 3
-  retry_delay: 5
+  retry_count: 2          # 3→2 (rate limit 절약)
+  retry_delay: 10         # 5→10 (rate limit 여유)
 
 # ─── TTS ───
 tts:
