@@ -81,12 +81,26 @@ jobs:
           echo "✅ 한글 폰트 설치 완료"
           fc-list | grep -i nanum | head -5
 
-      # ─── FFmpeg 확인 ───
-      - name: 🎬 Verify FFmpeg
+      # ─── FFmpeg 설치 및 확인 ───
+      - name: 🎬 Install and verify FFmpeg
         run: |
+          # 명시적 설치 (이미 있어도 안전)
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq ffmpeg
+          
+          # 경로 확인
+          which ffmpeg
+          which ffprobe
+          
+          # 버전 확인
           ffmpeg -version | head -1
           ffprobe -version | head -1
-          echo "✅ FFmpeg 확인 완료"
+          
+          # PATH에 있는지 확인
+          echo "ffmpeg path: $(which ffmpeg)"
+          echo "ffprobe path: $(which ffprobe)"
+          
+          echo "✅ FFmpeg 설치 완료"
 
       # ─── 디렉토리 준비 ───
       - name: 📁 Prepare directories
