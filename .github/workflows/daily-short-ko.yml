@@ -2,8 +2,8 @@ name: 🇰🇷 Daily Korean Short
 
 on:
   schedule:
-    - cron: '0 7 * * *'
-  
+    - cron: '0 5 * * *'
+    
   workflow_dispatch:
     inputs:
       category_override:
