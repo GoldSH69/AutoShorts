@@ -36,6 +36,9 @@ on:
         default: true
         type: boolean
 
+permissions:
+  contents: write
+
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
   GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
@@ -43,9 +46,9 @@ env:
   PIXABAY_API_KEY: ${{ secrets.PIXABAY_API_KEY }}
   TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
   TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-  YOUTUBE_CLIENT_ID: ${{ secrets.YOUTUBE_CLIENT_ID }}             
-  YOUTUBE_CLIENT_SECRET: ${{ secrets.YOUTUBE_CLIENT_SECRET }}     
-  YOUTUBE_REFRESH_TOKEN: ${{ secrets.YOUTUBE_REFRESH_TOKEN }}     
+  YOUTUBE_CLIENT_ID: ${{ secrets.YOUTUBE_CLIENT_ID }}
+  YOUTUBE_CLIENT_SECRET: ${{ secrets.YOUTUBE_CLIENT_SECRET }}
+  YOUTUBE_REFRESH_TOKEN: ${{ secrets.YOUTUBE_REFRESH_TOKEN }}
 
 jobs:
   test-generate:
@@ -54,10 +57,13 @@ jobs:
 
     steps:
       - name: 📥 Checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 1
 
       - name: 🐍 Setup Python
-        uses: actions/setup-python@v5.6.0
+        uses: actions/setup-python@v5
         with:
           python-version: '3.11'
           cache: 'pip'
@@ -82,7 +88,7 @@ jobs:
       - name: 📁 Prepare
         run: mkdir -p output history
 
-      - name: 🧪 Test Generate
+      - name: 🧪 Generate Short
         run: |
           cd scripts
           
@@ -98,25 +104,41 @@ jobs:
             ARGS="$ARGS --debug"
           fi
           
-          echo "🧪 테스트: python main.py $ARGS"
+          echo "🧪 python main.py $ARGS"
           python main.py $ARGS
 
-      - name: 📋 List generated files
+      - name: 📋 List files
         if: always()
         run: |
-          echo "=== output 폴더 ==="
+          echo "=== output ==="
           ls -lah output/ 2>/dev/null || echo "비어있음"
           echo ""
-          echo "=== 파일 상세 ==="
-          for f in output/*; do
-            if [ -f "$f" ]; then
-              echo "$(basename $f): $(du -h $f | cut -f1)"
-            fi
-          done
+          echo "=== history ==="
+          cat history/generated_topics.json 2>/dev/null || echo "비어있음"
+
+      - name: 📝 Update history
+        if: success()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          
+          # 변경사항 확인
+          echo "=== git status ==="
+          git status
+          
+          git add history/
+          
+          if git diff --staged --quiet; then
+            echo "⚠️ 히스토리 변경 없음"
+          else
+            git commit -m "📝 Update history $(date +%Y-%m-%d) [test]"
+            git push
+            echo "✅ 히스토리 커밋 완료"
+          fi
 
       - name: 💾 Save artifact
         if: always()
-        uses: actions/upload-artifact@v4.6.2
+        uses: actions/upload-artifact@v4
         with:
           name: test-short-${{ github.run_number }}
           path: |
