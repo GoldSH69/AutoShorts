@@ -67,5 +67,9 @@
     {"text": "효과 자막1", "duration": 5},
     {"text": "효과 자막2", "duration": 5},
     {"text": "CTA 자막", "duration": 3}
-  ]
+  ],
+  "instagram_caption": "인스타그램 본문 3~5줄 (이모지 포함, 마지막에 팔로우 유도 CTA)",
+  "instagram_hashtags": "#심리학 #자기계발 #뇌과학 #shorts #뇌를깨우는30초 ...",
+  "tiktok_caption": "틱톡 후킹 1~2줄 (이모지 포함)",
+  "tiktok_hashtags": "#심리학 #fyp #틱톡 #뇌를깨우는30초 ..."
 }
