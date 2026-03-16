@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 """
-뇌를 깨우는 30초 - 메인 오케스트레이터
+뇌를 깨우는 30초 - 메인 오케스트레이터 v2
 
 모든 단계를 순차적으로 실행:
 1. 설정 로드
 2. 스크립트 생성 (Gemini)
-3. TTS 음성 생성 (gTTS)
+3. TTS 음성 생성 (gTTS) → 세그먼트별 타이밍 측정
 4. 배경 영상 다운로드 (Pexels)
-5. 자막 생성 (ASS)
-6. 영상 합성 (FFmpeg)
+5. 자막 생성 (ASS) → TTS 타이밍 기반 싱크
+6. 영상 합성 (FFmpeg) → 음성 기준 길이
 7. YouTube 업로드 (옵션)
 8. 텔레그램 알림
 """
@@ -18,7 +18,6 @@ import sys
 import traceback
 from pathlib import Path
 
-# 경로 설정
 SCRIPT_DIR = Path(__file__).parent
 sys.path.insert(0, str(SCRIPT_DIR))
 
@@ -44,13 +43,12 @@ def main():
     args = parse_args()
     
     if args.debug:
-        setup_logging(level=10)  # DEBUG
+        setup_logging(level=10)
     
     logger.info("=" * 60)
-    logger.info("🧠 뇌를 깨우는 30초 - YouTube Shorts 자동화")
+    logger.info("🧠 뇌를 깨우는 30초 - YouTube Shorts 자동화 v2")
     logger.info("=" * 60)
     
-    # 설정 로드
     config_path = args.config
     if config_path:
         config = Config(config_path)
@@ -59,21 +57,16 @@ def main():
     
     language = args.language
     
-    # 채널 활성화 확인
     if not config.is_channel_enabled(language):
         logger.warning(f"채널이 비활성화 상태입니다: {language}")
-        logger.info("config.yml에서 채널을 활성화하세요")
         return
     
-    # 요일 결정
     if args.weekday is not None:
         weekday = args.weekday
     else:
         weekday = get_weekday()
     
-    # 카테고리 결정
     if args.category and args.category != 'auto':
-        # 카테고리 ID로 요일 매핑
         category_override = args.category
         for day_num in range(7):
             cat = config.get_today_category(day_num)
@@ -89,7 +82,6 @@ def main():
     logger.info(f"🌐 언어: {language}")
     logger.info(f"📂 카테고리: {category_emoji} {category_name} ({category_id})")
     
-    # 출력 경로 설정
     output_dir = get_output_dir()
     date_str = get_today_str()
     base_name = f"{date_str}_{language}_{category_id}"
@@ -99,10 +91,8 @@ def main():
     subtitle_path = str(output_dir / f"{base_name}_subtitle.ass")
     output_video_path = str(output_dir / f"{base_name}_final.mp4")
     
-    # 텔레그램 알림 준비
     notifier = TelegramNotifier(config)
     
-    # 결과 추적
     script_data = None
     video_duration = None
     upload_result = None
@@ -124,19 +114,29 @@ def main():
         logger.info(f"  스크립트: {script_data.get('full_script', '')[:80]}...")
         logger.info(f"  자막 세그먼트: {len(script_data.get('subtitle_segments', []))}개")
         
-        # ─── Step 2: TTS 음성 생성 ───
+        # ─── Step 2: TTS 음성 생성 (세그먼트별 타이밍 측정) ───
         logger.info("")
-        logger.info("🔊 Step 2: TTS 음성 생성 (gTTS)")
+        logger.info("🔊 Step 2: TTS 음성 생성 (gTTS + 자동 배속)")
         logger.info("-" * 40)
         
         tts = TTSGenerator(config)
-        narration_path, narration_duration = tts.generate(
+        
+        # ★ 세그먼트를 전달하여 각 세그먼트별 실제 타이밍 측정
+        tts_result = tts.generate(
             text=script_data['full_script'],
             output_path=narration_path,
             language=language,
+            segments=script_data.get('subtitle_segments'),
         )
         
+        # 반환값 처리 (v3: 3개 반환)
+        narration_path = tts_result[0]
+        narration_duration = tts_result[1]
+        timed_segments = tts_result[2] if len(tts_result) > 2 else None
+        
         logger.info(f"  나레이션 길이: {narration_duration:.1f}초")
+        if timed_segments:
+            logger.info(f"  실측 타이밍: {len(timed_segments)}개 세그먼트")
         
         # ─── Step 3: 배경 영상 다운로드 ───
         logger.info("")
@@ -152,9 +152,9 @@ def main():
             category_id=category_id,
         )
         
-        # ─── Step 4: 자막 생성 ───
+        # ─── Step 4: 자막 생성 (TTS 타이밍 기반) ───
         logger.info("")
-        logger.info("📄 Step 4: 자막 생성 (ASS)")
+        logger.info("📄 Step 4: 자막 생성 (음성 싱크)")
         logger.info("-" * 40)
         
         sub_gen = SubtitleGenerator(config)
@@ -163,6 +163,7 @@ def main():
             output_path=subtitle_path,
             language=language,
             total_duration=narration_duration,
+            timed_segments=timed_segments,  # ★ TTS 실측 타이밍 전달
         )
         
         # ─── Step 5: BGM 선택 ───
@@ -236,7 +237,6 @@ def main():
                 except Exception as e:
                     logger.error(f"  ❌ 업로드 오류: {e}")
                     logger.info("  영상은 정상 생성됨, 수동 업로드 가능")
-                    # 업로드 실패해도 전체 프로세스는 계속
             else:
                 logger.info("  YouTube 업로드 비활성화 (수동 업로드 모드)")
         else:
@@ -286,7 +286,6 @@ def main():
         logger.error(traceback.format_exc())
         logger.error("=" * 60)
         
-        # 텔레그램 실패 알림
         if not args.skip_telegram:
             try:
                 notifier.send_failure(
