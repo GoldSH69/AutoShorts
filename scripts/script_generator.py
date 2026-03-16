@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Gemini API 스크립트 생성 - v4 (모델별 최적 설정)
+Gemini API 스크립트 생성 - v5 (SNS 캡션 지원)
 """
 
 import time
@@ -28,7 +28,6 @@ THINKING_MODELS = {
 def is_thinking_model(model_name):
     """thinking 모델인지 확인 (lite는 제외)"""
     name = model_name.lower().replace('models/', '')
-    # lite가 붙으면 thinking 아님
     if 'lite' in name:
         return False
     for tm in THINKING_MODELS:
@@ -38,7 +37,7 @@ def is_thinking_model(model_name):
 
 
 class ScriptGenerator:
-    """Gemini 스크립트 생성기 v4"""
+    """Gemini 스크립트 생성기 v5 - SNS 캡션 지원"""
     
     def __init__(self, config):
         self.config = config
@@ -55,7 +54,7 @@ class ScriptGenerator:
         
         self.project_root = get_project_root()
         
-        logger.info(f"ScriptGenerator v4 초기화")
+        logger.info(f"ScriptGenerator v5 초기화 (SNS 캡션 지원)")
         logger.info(f"  주력 모델: {self.model_name} (thinking: {is_thinking_model(self.model_name)})")
         logger.info(f"  백업 모델: {self.fallback_models}")
         logger.info(f"  max_output_tokens: {self.max_tokens}")
@@ -76,19 +75,25 @@ class ScriptGenerator:
         return self._get_default_prompt(category_id, language)
     
     def _get_default_prompt(self, category_id, language='ko'):
-        """기본 프롬프트"""
+        """기본 프롬프트 (SNS 캡션 포함)"""
         category_name = self.config.get_category_name(language=language)
         
         return f"""유튜브 쇼츠 "뇌를 깨우는 30초" 채널의 "{category_name}" 스크립트를 작성하세요.
 
 규칙:
-- 한국어 나레이션 80-120자
+- 한국어 나레이션 150-250자
 - 첫 문장: 강력한 후킹 (질문 또는 충격적 사실)
 - 중간: 반전/놀라운 사실
 - 마지막: 구독 유도 1문장
 - 실제 심리학 근거 기반
 
 이전 주제: {{previous_topics}}
+
+SNS 캡션도 함께 생성하세요:
+- instagram_caption: 3~5줄 본문 (이모지 포함, 마지막에 팔로우 유도 CTA)
+- instagram_hashtags: 해시태그 10~15개 (#shorts #심리학 #뇌과학 #뇌를깨우는30초 필수)
+- tiktok_caption: 1~2줄 짧은 후킹 (이모지 포함)
+- tiktok_hashtags: 해시태그 8~10개 (#fyp #틱톡 #심리학 #뇌를깨우는30초 필수)
 
 반드시 아래 JSON 형식으로만 출력하세요:
 
@@ -106,7 +111,11 @@ class ScriptGenerator:
     {{"text": "자막3", "duration": 5}},
     {{"text": "자막4", "duration": 4}},
     {{"text": "자막5", "duration": 3}}
-  ]
+  ],
+  "instagram_caption": "인스타그램 본문 3~5줄",
+  "instagram_hashtags": "#심리학 #자기계발 #뇌과학 #shorts #뇌를깨우는30초 ...",
+  "tiktok_caption": "틱톡 후킹 1~2줄",
+  "tiktok_hashtags": "#심리학 #fyp #틱톡 #뇌를깨우는30초 ..."
 }}"""
     
     # ─── 히스토리 ───
@@ -156,26 +165,18 @@ class ScriptGenerator:
     def _call_gemini(self, prompt, model_name, use_json_mode=True):
         """
         Gemini API 호출 (모델에 따라 자동 최적화)
-        
-        Args:
-            prompt: 프롬프트
-            model_name: 모델명
-            use_json_mode: JSON 응답 모드 사용 여부
         """
         thinking = is_thinking_model(model_name)
         
         try:
-            # ─── Generation Config 구성 ───
             gen_config = {
                 'temperature': self.temperature,
                 'max_output_tokens': self.max_tokens,
             }
             
-            # JSON 모드
             if use_json_mode:
                 gen_config['response_mime_type'] = 'application/json'
             
-            # thinking 모델 처리
             if thinking:
                 try:
                     gen_config['thinking_config'] = {
@@ -189,7 +190,6 @@ class ScriptGenerator:
             think_str = "+thinking" if thinking else ""
             logger.info(f"  호출: {model_name} [{mode_str}{think_str}]")
             
-            # ─── API 호출 ───
             model = genai.GenerativeModel(
                 model_name,
                 generation_config=gen_config,
@@ -197,17 +197,14 @@ class ScriptGenerator:
             
             response = model.generate_content(prompt)
             
-            # ─── 응답 추출 ───
             text = None
             
-            # 방법 1: response.text
             try:
                 if response and response.text:
                     text = response.text
             except Exception:
                 pass
             
-            # 방법 2: candidates에서 추출
             if not text:
                 try:
                     if response and response.candidates:
@@ -215,7 +212,6 @@ class ScriptGenerator:
                             if candidate.content and candidate.content.parts:
                                 for part in candidate.content.parts:
                                     if hasattr(part, 'text') and part.text:
-                                        # thinking part는 건너뛰기
                                         if hasattr(part, 'thought') and part.thought:
                                             continue
                                         text = part.text
@@ -231,7 +227,6 @@ class ScriptGenerator:
                 return text
             else:
                 logger.warning(f"  ⚠️ 빈 응답")
-                # 응답 상세 정보
                 try:
                     if response:
                         feedback = getattr(response, 'prompt_feedback', None)
@@ -254,7 +249,6 @@ class ScriptGenerator:
                     return self._call_gemini(prompt, model_name, use_json_mode=False)
             elif 'thinking_config' in error_str or 'thinking_budget' in error_str:
                 logger.warning(f"  ⚠️ thinking_config 미지원, 제거 후 재시도")
-                # thinking_config 없이 재시도
                 return self._call_gemini_simple(prompt, model_name, use_json_mode)
             else:
                 logger.error(f"  ❌ API 오류 ({model_name}): {error_str[:200]}")
@@ -295,12 +289,10 @@ class ScriptGenerator:
         
         logger.info(f"스크립트 생성 시작: 카테고리={category_id}, 언어={language}")
         
-        # 프롬프트 준비
         template = self._load_prompt_template(category_id, language)
         previous_topics = self._get_previous_topics(category_id)
         prompt = template.replace('{previous_topics}', previous_topics)
         
-        # 모델 리스트 (중복 제거)
         models = []
         seen = set()
         for m in [self.model_name] + self.fallback_models:
@@ -317,7 +309,6 @@ class ScriptGenerator:
             logger.info(f"📡 모델: {model_name}")
             logger.info(f"{'─'*50}")
             
-            # ── 시도 1: JSON 모드 ──
             for attempt in range(self.retry_count):
                 logger.info(f"[시도 {attempt+1}/{self.retry_count}] JSON 모드")
                 
@@ -339,7 +330,6 @@ class ScriptGenerator:
             if result:
                 break
             
-            # ── 시도 2: 텍스트 모드 ──
             logger.info(f"[텍스트 모드] 재시도")
             raw = self._call_gemini(prompt, model_name, use_json_mode=False)
             
@@ -359,6 +349,8 @@ class ScriptGenerator:
         logger.info(f"\n✅ 스크립트 생성 성공!")
         logger.info(f"  제목: {result.get('title', '')}")
         logger.info(f"  스크립트: {result.get('full_script', '')[:80]}...")
+        logger.info(f"  인스타 캡션: {'있음' if result.get('instagram_caption') else '기본값'}")
+        logger.info(f"  틱톡 캡션: {'있음' if result.get('tiktok_caption') else '기본값'}")
         
         self._save_history(category_id, result)
         return result
@@ -366,7 +358,7 @@ class ScriptGenerator:
     # ─── 검증 ───
     
     def _validate_script(self, data):
-        """스크립트 검증"""
+        """스크립트 검증 (SNS 캡션 포함)"""
         if not isinstance(data, dict):
             logger.warning("검증 실패: dict 아님")
             return False
@@ -397,7 +389,6 @@ class ScriptGenerator:
         if not segments or not isinstance(segments, list) or len(segments) < 1:
             data['subtitle_segments'] = self._auto_segments(script)
         else:
-            # segments가 있지만 형식 확인
             valid_segments = []
             for seg in segments:
                 if isinstance(seg, dict) and seg.get('text'):
@@ -410,7 +401,7 @@ class ScriptGenerator:
             else:
                 data['subtitle_segments'] = self._auto_segments(script)
         
-        # 기본값 채우기
+        # 기본값 채우기 (기존 필드)
         if not data.get('hook'):
             data['hook'] = script[:50]
         if not data.get('body'):
@@ -421,6 +412,33 @@ class ScriptGenerator:
             data['description'] = title
         if not data.get('search_keyword'):
             data['search_keyword'] = 'psychology brain'
+        
+        # ─── SNS 캡션 기본값 ───
+        if not data.get('instagram_caption'):
+            data['instagram_caption'] = (
+                f"{data['hook']} 🧠\n\n"
+                f"{data.get('description', title)}\n\n"
+                f"👉 팔로우하고 매일 심리학 지식 받아가세요!"
+            )
+            logger.info("  인스타 캡션: 기본값 생성")
+        
+        if not data.get('instagram_hashtags'):
+            data['instagram_hashtags'] = (
+                "#심리학 #뇌과학 #자기계발 #심리해킹 #인간관계 "
+                "#shorts #뇌를깨우는30초 #심리학퀴즈 #멘탈 #마인드셋"
+            )
+            logger.info("  인스타 해시태그: 기본값 생성")
+        
+        if not data.get('tiktok_caption'):
+            data['tiktok_caption'] = f"{data['hook']} 😳🧠"
+            logger.info("  틱톡 캡션: 기본값 생성")
+        
+        if not data.get('tiktok_hashtags'):
+            data['tiktok_hashtags'] = (
+                "#심리학 #뇌과학 #자기계발 #fyp #틱톡 "
+                "#뇌를깨우는30초 #심리해킹 #shorts"
+            )
+            logger.info("  틱톡 해시태그: 기본값 생성")
         
         logger.info(f"검증 ✅: '{title}' ({len(data['full_script'])}자, {len(data['subtitle_segments'])}세그먼트)")
         return True
