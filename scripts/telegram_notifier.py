@@ -1,17 +1,18 @@
 #!/usr/bin/env python3
 """
-텔레그램 알림
+텔레그램 알림 - v2 (SNS 캡션 지원)
 """
 
 import os
 import sys
 import json
+import time
 import requests
 from pathlib import Path
 from utils import logger, get_env, get_today_str, get_weekday_name_ko
 
 class TelegramNotifier:
-    """텔레그램 봇 알림"""
+    """텔레그램 봇 알림 v2 - SNS 캡션 지원"""
     
     def __init__(self, config):
         self.config = config
@@ -27,7 +28,7 @@ class TelegramNotifier:
         self.base_url = f"https://api.telegram.org/bot{self.bot_token}"
         self.tg_config = config.get_telegram_config()
         
-        logger.info(f"TelegramNotifier 초기화 (활성화: {self.enabled})")
+        logger.info(f"TelegramNotifier v2 초기화 (활성화: {self.enabled})")
     
     def send_success(self, video_path=None, script_data=None, 
                      upload_result=None, video_duration=None,
@@ -75,15 +76,54 @@ class TelegramNotifier:
 {link_line}
 {meta_info}"""
         
-        # 텍스트 메시지 전송
+        # ① 메인 상태 메시지 전송
         self._send_message(message)
         
-        # 영상 파일 전송 (옵션)
+        # ② SNS 캡션 전송 (인스타/틱톡 각각 별도 메시지)
+        if script_data:
+            self._send_sns_captions(script_data, title)
+        
+        # ③ 영상 파일 전송 (옵션)
         if (video_path and Path(video_path).exists() 
             and self.tg_config.get('send_video', True)):
             self._send_video(video_path, f"{emoji} {title}")
         
         return True
+    
+    def _send_sns_captions(self, script_data, title=''):
+        """SNS 복사용 캡션을 별도 메시지로 전송"""
+        
+        ig_caption = script_data.get('instagram_caption', '')
+        ig_hashtags = script_data.get('instagram_hashtags', '')
+        tk_caption = script_data.get('tiktok_caption', '')
+        tk_hashtags = script_data.get('tiktok_hashtags', '')
+        
+        if not ig_caption and not tk_caption:
+            logger.info("SNS 캡션 없음, 건너뜀")
+            return
+        
+        # ── 인스타그램 메시지 ──
+        if ig_caption:
+            ig_message = (
+                f"📸 인스타그램용 (복사해서 사용하세요)\n"
+                f"━━━━━━━━━━━━━━━━━━\n\n"
+                f"{ig_caption}\n\n"
+                f"{ig_hashtags}"
+            )
+            self._send_message(ig_message, parse_mode=None)
+            logger.info("인스타그램 캡션 전송 완료")
+            time.sleep(0.5)
+        
+        # ── 틱톡 메시지 ──
+        if tk_caption:
+            tk_message = (
+                f"🎵 틱톡용 (복사해서 사용하세요)\n"
+                f"━━━━━━━━━━━━━━━━━━\n\n"
+                f"{tk_caption}\n\n"
+                f"{tk_hashtags}"
+            )
+            self._send_message(tk_message, parse_mode=None)
+            logger.info("틱톡 캡션 전송 완료")
     
     def send_failure(self, error_message, language='ko', weekday=None):
         """실패 알림 전송"""
@@ -92,7 +132,6 @@ class TelegramNotifier:
         
         category_name = self.config.get_category_name(weekday, language)
         
-        # GitHub Actions 로그 링크
         repo = os.environ.get('GITHUB_REPOSITORY', '')
         run_id = os.environ.get('GITHUB_RUN_ID', '')
         log_link = ""
@@ -117,20 +156,28 @@ class TelegramNotifier:
             return False
         return self._send_message(message)
     
-    def _send_message(self, text):
-        """텍스트 메시지 전송"""
+    def _send_message(self, text, parse_mode='HTML'):
+        """
+        텍스트 메시지 전송
+        
+        Args:
+            text: 메시지 텍스트
+            parse_mode: 'HTML', 'Markdown', 또는 None (SNS 캡션은 None 권장)
+        """
         try:
-            max_len = self.tg_config.get('max_caption_length', 1024)
+            max_len = 4096
             if len(text) > max_len:
-                text = text[:max_len-3] + "..."
+                text = text[:max_len - 3] + "..."
             
             url = f"{self.base_url}/sendMessage"
             payload = {
                 'chat_id': self.chat_id,
                 'text': text,
-                'parse_mode': 'HTML',
                 'disable_web_page_preview': True,
             }
+            
+            if parse_mode:
+                payload['parse_mode'] = parse_mode
             
             response = requests.post(url, json=payload, timeout=30)
             
@@ -138,6 +185,10 @@ class TelegramNotifier:
                 logger.info("텔레그램 메시지 전송 성공")
                 return True
             else:
+                if parse_mode == 'HTML' and response.status_code == 400:
+                    logger.warning("HTML 파싱 실패, plain text로 재시도")
+                    return self._send_message(text, parse_mode=None)
+                
                 logger.error(f"텔레그램 메시지 전송 실패: {response.status_code}")
                 logger.error(response.text)
                 return False
@@ -149,7 +200,6 @@ class TelegramNotifier:
     def _send_video(self, video_path, caption=""):
         """영상 파일 전송"""
         try:
-            # 파일 크기 확인 (텔레그램 제한: 50MB)
             file_size = Path(video_path).stat().st_size / (1024 * 1024)
             
             if file_size > 50:
@@ -157,7 +207,6 @@ class TelegramNotifier:
                 return False
             
             url = f"{self.base_url}/sendVideo"
-            
             caption_text = f"🎬 {caption}"[:1024]
             
             with open(video_path, 'rb') as video_file:
@@ -175,6 +224,7 @@ class TelegramNotifier:
                 return True
             else:
                 logger.error(f"텔레그램 영상 전송 실패: {response.status_code}")
+                logger.error(response.text)
                 return False
                 
         except Exception as e:
