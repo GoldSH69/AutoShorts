@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-gTTS 기반 음성 생성 - v2 (ffprobe 경로 문제 해결)
+gTTS 기반 음성 생성 - v3 (자동 배속 + 세그먼트별 길이 측정)
 """
 
 import io
@@ -8,19 +8,18 @@ import os
 import re
 import shutil
 import tempfile
+import subprocess
+import json
 from pathlib import Path
 from gtts import gTTS
 from utils import logger, ensure_dir
 
-# ─── pydub ffmpeg 경로 설정 (반드시 import 전에) ───
+# ─── pydub ffmpeg 경로 설정 ───
 def _setup_ffmpeg_path():
     """ffmpeg/ffprobe 경로를 pydub에 설정"""
-    
-    # 방법 1: which 명령으로 경로 찾기
     ffmpeg_path = shutil.which('ffmpeg')
     ffprobe_path = shutil.which('ffprobe')
     
-    # 방법 2: 일반적인 설치 경로 확인
     if not ffmpeg_path:
         for path in ['/usr/bin/ffmpeg', '/usr/local/bin/ffmpeg']:
             if os.path.exists(path):
@@ -35,20 +34,13 @@ def _setup_ffmpeg_path():
     
     if ffmpeg_path:
         logger.info(f"ffmpeg 경로: {ffmpeg_path}")
-    else:
-        logger.warning("⚠️ ffmpeg을 찾을 수 없습니다!")
-    
     if ffprobe_path:
         logger.info(f"ffprobe 경로: {ffprobe_path}")
-    else:
-        logger.warning("⚠️ ffprobe를 찾을 수 없습니다!")
     
     return ffmpeg_path, ffprobe_path
 
-# ffmpeg 경로 찾기
 _ffmpeg_path, _ffprobe_path = _setup_ffmpeg_path()
 
-# pydub import 및 경로 설정
 from pydub import AudioSegment
 
 if _ffmpeg_path:
@@ -58,81 +50,243 @@ if _ffprobe_path:
 
 
 class TTSGenerator:
-    """gTTS 음성 생성기 v2"""
+    """gTTS 음성 생성기 v3 - 자동 배속 + 세그먼트별 타이밍"""
     
     def __init__(self, config):
         self.config = config
-        logger.info("TTSGenerator v2 초기화 (gTTS)")
+        self.video_config = config.get_video_config()
+        logger.info("TTSGenerator v3 초기화 (자동 배속 + 세그먼트 타이밍)")
     
-    def generate(self, text, output_path, language='ko'):
+    def generate(self, text, output_path, language='ko', segments=None):
         """
         텍스트를 음성으로 변환
         
+        Args:
+            text: 전체 나레이션 텍스트
+            output_path: 출력 파일 경로
+            language: 언어
+            segments: subtitle_segments (각 세그먼트별 타이밍 측정용)
+        
         Returns:
-            tuple: (output_path, duration_seconds)
+            tuple: (output_path, duration_seconds, timed_segments)
+            - timed_segments: [{"text": "...", "start": 0.0, "end": 3.2}, ...]
         """
         tts_config = self.config.get_tts_config(language)
         
         logger.info(f"TTS 생성 시작 (언어: {language}, 길이: {len(text)}자)")
         ensure_dir(Path(output_path).parent)
         
+        # 목표 시간 설정
+        target_duration = self.video_config.get('duration', 50)  # 기본 50초
+        max_duration = self.video_config.get('max_duration', 55)  # 최대 55초
+        
+        logger.info(f"  목표: {target_duration}초, 최대: {max_duration}초")
+        
         try:
-            # 문장 분할
-            sentences = self._split_sentences(text, language)
-            logger.info(f"문장 분할: {len(sentences)}개")
-            
-            # 임시 디렉토리 사용
-            with tempfile.TemporaryDirectory() as tmp_dir:
-                audio_files = []
-                
-                for i, sentence in enumerate(sentences):
-                    sentence = sentence.strip()
-                    if not sentence:
-                        continue
-                    
-                    logger.info(f"  문장 {i+1}/{len(sentences)}: {sentence[:40]}...")
-                    
-                    # gTTS로 각 문장 생성 → 임시 파일 저장
-                    tmp_file = os.path.join(tmp_dir, f"sentence_{i:03d}.mp3")
-                    
-                    tts = gTTS(
-                        text=sentence,
-                        lang=tts_config['lang'],
-                        tld=tts_config['tld'],
-                        slow=False
-                    )
-                    tts.save(tmp_file)
-                    audio_files.append(tmp_file)
-                
-                if not audio_files:
-                    raise Exception("생성된 오디오 파일이 없습니다")
-                
-                # 오디오 합치기
-                combined = self._combine_audio_files(
-                    audio_files, 
-                    silence_ms=tts_config.get('silence_ms', 300)
+            # ── 세그먼트 기반 생성 (자막 싱크용) ──
+            if segments and len(segments) > 0:
+                return self._generate_with_segments(
+                    segments, output_path, language, tts_config,
+                    target_duration, max_duration
                 )
-                
-                # 속도 조절
-                speed_factor = tts_config.get('speed_factor', 1.0)
-                if speed_factor != 1.0 and speed_factor > 0:
-                    combined = self._change_speed(combined, speed_factor)
-                    logger.info(f"속도 조절: {speed_factor}x")
-                
-                # 최종 저장
-                combined.export(output_path, format='mp3', bitrate='128k')
-                
-                duration = len(combined) / 1000.0
-                logger.info(f"TTS 생성 완료: {output_path} ({duration:.1f}초)")
-                
-                return output_path, duration
+            
+            # ── 기존 방식 (세그먼트 없을 때) ──
+            return self._generate_simple(
+                text, output_path, language, tts_config,
+                target_duration, max_duration
+            )
             
         except Exception as e:
             logger.error(f"TTS 생성 실패: {e}")
             raise
     
-    def _combine_audio_files(self, file_paths, silence_ms=300):
-        """여러 오디오 파일을 하나로 합치기 (파일 기반, BytesIO 미사용)"""
+    def _generate_with_segments(self, segments, output_path, language,
+                                 tts_config, target_duration, max_duration):
+        """
+        세그먼트별 TTS 생성 → 실제 타이밍 측정 → 자동 배속
+        
+        Returns:
+            tuple: (output_path, duration, timed_segments)
+        """
+        logger.info(f"세그먼트 기반 TTS 생성 ({len(segments)}개)")
+        
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            segment_audios = []  # [(AudioSegment, text), ...]
+            silence_ms = tts_config.get('silence_ms', 250)
+            silence = AudioSegment.silent(duration=silence_ms)
+            
+            # ① 각 세그먼트별 TTS 생성
+            for i, seg in enumerate(segments):
+                text = seg.get('text', '').strip()
+                if not text:
+                    continue
+                
+                logger.info(f"  세그먼트 {i+1}/{len(segments)}: {text[:30]}...")
+                
+                tmp_file = os.path.join(tmp_dir, f"seg_{i:03d}.mp3")
+                
+                tts = gTTS(
+                    text=text,
+                    lang=tts_config['lang'],
+                    tld=tts_config['tld'],
+                    slow=False
+                )
+                tts.save(tmp_file)
+                
+                audio = AudioSegment.from_file(tmp_file, format='mp3')
+                segment_audios.append((audio, text))
+            
+            if not segment_audios:
+                raise Exception("생성된 오디오 세그먼트가 없습니다")
+            
+            # ② 원본 합치기 (배속 전 길이 측정)
+            combined_raw = AudioSegment.empty()
+            for i, (audio, text) in enumerate(segment_audios):
+                combined_raw += audio
+                if i < len(segment_audios) - 1:
+                    combined_raw += silence
+            
+            raw_duration = len(combined_raw) / 1000.0
+            logger.info(f"  원본 음성 길이: {raw_duration:.1f}초")
+            
+            # ③ 배속 계산 (목표 시간에 맞추기)
+            # 나레이션은 target_duration - 2초 (앞뒤 여유) 안에 들어와야 함
+            narration_target = target_duration - 2.0
+            
+            if raw_duration > narration_target:
+                speed_factor = raw_duration / narration_target
+                # 최대 1.35배까지만 (너무 빠르면 알아듣기 힘듦)
+                speed_factor = min(speed_factor, 1.35)
+                logger.info(f"  자동 배속: {speed_factor:.2f}x ({raw_duration:.1f}초 → {raw_duration/speed_factor:.1f}초)")
+            elif raw_duration < narration_target * 0.7:
+                # 너무 짧으면 약간 느리게 (최소 0.9배)
+                speed_factor = max(raw_duration / narration_target, 0.9)
+                logger.info(f"  속도 조절: {speed_factor:.2f}x (약간 느리게)")
+            else:
+                speed_factor = 1.0
+                logger.info(f"  속도 조절 불필요 ({raw_duration:.1f}초)")
+            
+            # config의 speed_factor가 있으면 추가 적용
+            config_speed = tts_config.get('speed_factor', 1.0)
+            if config_speed != 1.0:
+                speed_factor *= config_speed
+                logger.info(f"  config 배속 추가: 최종 {speed_factor:.2f}x")
+            
+            # ④ 각 세그먼트에 배속 적용 + 타이밍 측정
+            timed_segments = []
+            combined_final = AudioSegment.empty()
+            current_time = 0.0
+            
+            for i, (audio, text) in enumerate(segment_audios):
+                # 배속 적용
+                if speed_factor != 1.0:
+                    audio = self._change_speed(audio, speed_factor)
+                
+                seg_duration = len(audio) / 1000.0
+                
+                # 타이밍 기록
+                timed_segments.append({
+                    'text': text,
+                    'start': round(current_time, 2),
+                    'end': round(current_time + seg_duration, 2),
+                    'duration': round(seg_duration, 2),
+                })
+                
+                combined_final += audio
+                current_time += seg_duration
+                
+                # 묵음 추가 (마지막 제외)
+                if i < len(segment_audios) - 1:
+                    # 배속에 따라 묵음도 줄이기
+                    adjusted_silence_ms = int(silence_ms / max(speed_factor, 1.0))
+                    adjusted_silence_ms = max(adjusted_silence_ms, 100)  # 최소 100ms
+                    adj_silence = AudioSegment.silent(duration=adjusted_silence_ms)
+                    combined_final += adj_silence
+                    current_time += adjusted_silence_ms / 1000.0
+            
+            # ⑤ 최종 길이 확인 및 추가 배속 (여전히 길면)
+            final_duration = len(combined_final) / 1000.0
+            
+            if final_duration > max_duration - 2:
+                extra_speed = final_duration / (max_duration - 3)
+                extra_speed = min(extra_speed, 1.2)
+                logger.warning(f"  ⚠️ 여전히 김 ({final_duration:.1f}초), 추가 배속 {extra_speed:.2f}x")
+                combined_final = self._change_speed(combined_final, extra_speed)
+                
+                # 타이밍 재계산
+                for seg in timed_segments:
+                    seg['start'] = round(seg['start'] / extra_speed, 2)
+                    seg['end'] = round(seg['end'] / extra_speed, 2)
+                    seg['duration'] = round(seg['duration'] / extra_speed, 2)
+                
+                final_duration = len(combined_final) / 1000.0
+            
+            # ⑥ 저장
+            combined_final.export(output_path, format='mp3', bitrate='128k')
+            
+            logger.info(f"TTS 생성 완료: {final_duration:.1f}초, {len(timed_segments)}개 세그먼트")
+            for i, ts in enumerate(timed_segments):
+                logger.info(f"  [{ts['start']:.1f}s ~ {ts['end']:.1f}s] {ts['text'][:25]}...")
+            
+            return output_path, final_duration, timed_segments
+    
+    def _generate_simple(self, text, output_path, language, tts_config,
+                          target_duration, max_duration):
+        """세그먼트 없이 전체 텍스트 기반 생성 (폴백)"""
+        
+        sentences = self._split_sentences(text, language)
+        logger.info(f"문장 분할: {len(sentences)}개")
+        
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            audio_files = []
+            
+            for i, sentence in enumerate(sentences):
+                sentence = sentence.strip()
+                if not sentence:
+                    continue
+                
+                tmp_file = os.path.join(tmp_dir, f"sentence_{i:03d}.mp3")
+                
+                tts = gTTS(
+                    text=sentence,
+                    lang=tts_config['lang'],
+                    tld=tts_config['tld'],
+                    slow=False
+                )
+                tts.save(tmp_file)
+                audio_files.append(tmp_file)
+            
+            if not audio_files:
+                raise Exception("생성된 오디오 파일이 없습니다")
+            
+            combined = self._combine_audio_files(
+                audio_files,
+                silence_ms=tts_config.get('silence_ms', 250)
+            )
+            
+            # 자동 배속
+            raw_duration = len(combined) / 1000.0
+            narration_target = target_duration - 2.0
+            
+            if raw_duration > narration_target:
+                speed_factor = min(raw_duration / narration_target, 1.35)
+                combined = self._change_speed(combined, speed_factor)
+                logger.info(f"자동 배속: {speed_factor:.2f}x")
+            
+            config_speed = tts_config.get('speed_factor', 1.0)
+            if config_speed != 1.0:
+                combined = self._change_speed(combined, config_speed)
+            
+            combined.export(output_path, format='mp3', bitrate='128k')
+            
+            duration = len(combined) / 1000.0
+            logger.info(f"TTS 생성 완료: {output_path} ({duration:.1f}초)")
+            
+            # timed_segments 없이 반환 (호환성)
+            return output_path, duration, None
+    
+    def _combine_audio_files(self, file_paths, silence_ms=250):
+        """여러 오디오 파일을 하나로 합치기"""
         combined = AudioSegment.empty()
         silence = AudioSegment.silent(duration=silence_ms)
         
@@ -140,14 +294,10 @@ class TTSGenerator:
             try:
                 segment = AudioSegment.from_file(fp, format='mp3')
                 combined += segment
-                
-                # 마지막 아닌 경우 묵음 추가
                 if i < len(file_paths) - 1:
                     combined += silence
-                    
             except Exception as e:
                 logger.warning(f"  오디오 파일 로드 실패 ({fp}): {e}")
-                # 실패한 파일은 건너뛰기
                 continue
         
         if len(combined) == 0:
@@ -164,7 +314,6 @@ class TTSGenerator:
         
         result = [s.strip() for s in sentences if s.strip()]
         
-        # 문장이 너무 적으면 쉼표로도 분할
         if len(result) <= 1 and len(text) > 60:
             sentences = re.split(r'[,，]\s*', text)
             result = [s.strip() for s in sentences if s.strip()]
