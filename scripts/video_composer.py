@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-FFmpeg 기반 영상 합성
+FFmpeg 기반 영상 합성 - v2 (음성 기준 길이)
 """
 
 import os
@@ -12,7 +12,7 @@ from pydub import AudioSegment
 from utils import logger, ensure_dir
 
 class VideoComposer:
-    """FFmpeg 영상 합성기"""
+    """FFmpeg 영상 합성기 v2 - 음성 기준 길이"""
     
     def __init__(self, config):
         self.config = config
@@ -24,36 +24,36 @@ class VideoComposer:
         self.fps = self.video_config.get('fps', 30)
         self.bg_opacity = self.video_config.get('background_opacity', 0.4)
         
-        logger.info("VideoComposer 초기화")
+        logger.info("VideoComposer v2 초기화 (음성 기준 길이)")
     
     def compose(self, background_path, narration_path, subtitle_path, 
                 output_path, bgm_path=None, narration_duration=None):
         """
         영상 합성
         
-        Args:
-            background_path: 배경 영상
-            narration_path: 나레이션 오디오
-            subtitle_path: ASS 자막 파일
-            output_path: 출력 영상
-            bgm_path: BGM 파일 (옵션)
-            narration_duration: 나레이션 길이 (초)
-        
         Returns:
-            str: 출력 파일 경로
-            float: 영상 길이
+            tuple: (output_path, video_duration)
         """
         ensure_dir(Path(output_path).parent)
         
-        # 나레이션 길이 확인
+        # 나레이션 길이 확인 (정확한 값 사용)
         if narration_duration is None:
             narration_duration = self._get_duration(narration_path)
         
-        # 목표 영상 길이 = 나레이션 + 여유 (최대 58초)
-        max_duration = self.video_config.get('max_duration', 58)
+        # ★ 영상 길이 = 나레이션 + 여유 (음성이 잘리지 않도록)
+        # 나레이션 끝나고 1초 여유 + 절대 max 55초
+        max_duration = self.video_config.get('max_duration', 55)
         target_duration = min(narration_duration + 1.5, max_duration)
         
-        logger.info(f"영상 합성 시작 (목표: {target_duration:.1f}초)")
+        # 나레이션이 max_duration보다 길면 경고 (TTS에서 이미 조절됨)
+        if narration_duration > max_duration:
+            logger.warning(f"⚠️ 나레이션({narration_duration:.1f}초) > max({max_duration}초)")
+            logger.warning(f"  영상이 {max_duration}초에서 잘릴 수 있습니다")
+            target_duration = max_duration
+        
+        logger.info(f"영상 합성 시작")
+        logger.info(f"  나레이션: {narration_duration:.1f}초")
+        logger.info(f"  목표 영상: {target_duration:.1f}초")
         
         # 오디오 믹싱 (나레이션 + BGM)
         mixed_audio_path = str(Path(output_path).parent / "mixed_audio.mp3")
@@ -83,7 +83,6 @@ class VideoComposer:
                 logger.error(f"FFmpeg 오류:\n{result.stderr[-2000:]}")
                 raise Exception(f"FFmpeg 실패: {result.returncode}")
             
-            # 결과 확인
             if not Path(output_path).exists():
                 raise Exception("출력 파일이 생성되지 않았습니다")
             
@@ -92,7 +91,6 @@ class VideoComposer:
             
             logger.info(f"영상 합성 완료: {output_size:.1f}MB, {output_duration:.1f}초")
             
-            # 임시 파일 정리
             self._cleanup([mixed_audio_path])
             
             return output_path, output_duration
@@ -110,7 +108,6 @@ class VideoComposer:
             try:
                 bgm = AudioSegment.from_file(bgm_path)
                 
-                # BGM 볼륨 조절 (dB 변환)
                 bgm_volume = self.bgm_config.get('volume', 0.08)
                 if bgm_volume > 0:
                     volume_db = 20 * math.log10(bgm_volume)
@@ -118,7 +115,6 @@ class VideoComposer:
                     volume_db = -40
                 bgm = bgm + volume_db
                 
-                # BGM 길이 맞추기 (루프 또는 자르기)
                 target_ms = int(target_duration * 1000)
                 
                 if len(bgm) < target_ms:
@@ -127,16 +123,13 @@ class VideoComposer:
                 
                 bgm = bgm[:target_ms]
                 
-                # 페이드 인/아웃
                 fade_in = self.bgm_config.get('fade_in_ms', 1000)
                 fade_out = self.bgm_config.get('fade_out_ms', 2000)
                 bgm = bgm.fade_in(fade_in).fade_out(fade_out)
                 
-                # 나레이션을 BGM 위에 오버레이
                 if len(bgm) >= len(narration):
                     mixed = bgm.overlay(narration)
                 else:
-                    # 나레이션이 더 긴 경우 BGM을 패딩
                     silence_pad = AudioSegment.silent(duration=len(narration) - len(bgm))
                     bgm_padded = bgm + silence_pad
                     mixed = bgm_padded.overlay(narration)
@@ -148,7 +141,6 @@ class VideoComposer:
             except Exception as e:
                 logger.warning(f"BGM 믹싱 실패, 나레이션만 사용: {e}")
         
-        # BGM 없이 나레이션만
         narration.export(output_path, format='mp3', bitrate='192k')
         logger.info(f"오디오 준비 완료 (나레이션만, {len(narration)/1000:.1f}초)")
     
@@ -156,55 +148,35 @@ class VideoComposer:
                               subtitle_path, output_path, target_duration):
         """FFmpeg 명령 빌드"""
         
-        # 배경 영상 길이 확인
         bg_duration = self._get_duration(background_path)
         
-        # 배경이 짧으면 루프
         loop_count = 1
         if bg_duration < target_duration:
             loop_count = int(target_duration / bg_duration) + 1
         
-        # 자막 파일 경로 (FFmpeg용 이스케이프)
         sub_path_escaped = str(subtitle_path).replace('\\', '/').replace(':', '\\:')
         
-        # 어두운 오버레이 값
-        opacity_hex = format(int(self.bg_opacity * 255), '02x')
+        cmd = ['ffmpeg', '-y']
         
-        cmd = [
-            'ffmpeg', '-y',
-        ]
-        
-        # 입력: 배경 영상 (루프)
         if loop_count > 1:
-            cmd.extend([
-                '-stream_loop', str(loop_count - 1),
-            ])
-        cmd.extend([
-            '-i', str(background_path),
-        ])
+            cmd.extend(['-stream_loop', str(loop_count - 1)])
+        cmd.extend(['-i', str(background_path)])
         
-        # 입력: 오디오
-        cmd.extend([
-            '-i', str(audio_path),
-        ])
+        cmd.extend(['-i', str(audio_path)])
         
-        # 필터 체인
         filter_parts = []
         
-        # 1. 배경 영상 스케일 + 크롭 (세로 9:16)
         filter_parts.append(
             f"[0:v]scale={self.width}:{self.height}:force_original_aspect_ratio=increase,"
             f"crop={self.width}:{self.height},"
             f"setsar=1[scaled]"
         )
         
-        # 2. 어두운 오버레이
         filter_parts.append(
             f"[scaled]drawbox=0:0:{self.width}:{self.height}:"
             f"color=black@{self.bg_opacity}:t=fill[darkened]"
         )
         
-        # 3. 자막 합성
         filter_parts.append(
             f"[darkened]ass='{sub_path_escaped}'[subbed]"
         )
