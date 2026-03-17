@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Gemini API 스크립트 생성 - v5 (SNS 캡션 지원)
+Gemini API 스크립트 생성 - v6 (SNS 캡션 + 다중 키워드)
 """
 
 import time
@@ -37,7 +37,7 @@ def is_thinking_model(model_name):
 
 
 class ScriptGenerator:
-    """Gemini 스크립트 생성기 v5 - SNS 캡션 지원"""
+    """Gemini 스크립트 생성기 v6 - SNS 캡션 + 다중 키워드"""
     
     def __init__(self, config):
         self.config = config
@@ -54,7 +54,7 @@ class ScriptGenerator:
         
         self.project_root = get_project_root()
         
-        logger.info(f"ScriptGenerator v5 초기화 (SNS 캡션 지원)")
+        logger.info(f"ScriptGenerator v6 초기화 (SNS 캡션 + 다중 키워드)")
         logger.info(f"  주력 모델: {self.model_name} (thinking: {is_thinking_model(self.model_name)})")
         logger.info(f"  백업 모델: {self.fallback_models}")
         logger.info(f"  max_output_tokens: {self.max_tokens}")
@@ -75,7 +75,7 @@ class ScriptGenerator:
         return self._get_default_prompt(category_id, language)
     
     def _get_default_prompt(self, category_id, language='ko'):
-        """기본 프롬프트 (SNS 캡션 포함)"""
+        """기본 프롬프트 (SNS 캡션 + 다중 키워드 포함)"""
         category_name = self.config.get_category_name(language=language)
         
         return f"""유튜브 쇼츠 "뇌를 깨우는 30초" 채널의 "{category_name}" 스크립트를 작성하세요.
@@ -88,6 +88,13 @@ class ScriptGenerator:
 - 실제 심리학 근거 기반
 
 이전 주제: {{previous_topics}}
+
+배경 영상 키워드 규칙:
+search_keywords는 Pexels에서 검색할 영어 키워드 3개를 배열로 생성하세요:
+- 각 키워드는 1~3단어의 영어 (예: "brain neuron", "thinking person", "dark abstract")
+- 영상 내용의 분위기/주제와 맞는 키워드
+- 사람 얼굴 정면보다는 추상적/분위기 있는 영상 키워드 선호
+- 3개가 서로 다른 느낌이어야 함 (다양한 배경 전환을 위해)
 
 SNS 캡션도 함께 생성하세요:
 - instagram_caption: 3~5줄 본문 (이모지 포함, 마지막에 팔로우 유도 CTA)
@@ -104,7 +111,7 @@ SNS 캡션도 함께 생성하세요:
   "cta": "마무리 CTA",
   "full_script": "전체 나레이션 (hook+body+cta를 자연스럽게 연결)",
   "description": "유튜브 설명 50자 이내",
-  "search_keyword": "배경영상 영어 키워드 1개",
+  "search_keywords": ["영어키워드1", "영어키워드2", "영어키워드3"],
   "subtitle_segments": [
     {{"text": "자막1", "duration": 3}},
     {{"text": "자막2", "duration": 4}},
@@ -163,9 +170,7 @@ SNS 캡션도 함께 생성하세요:
     # ─── Gemini API 호출 ───
     
     def _call_gemini(self, prompt, model_name, use_json_mode=True):
-        """
-        Gemini API 호출 (모델에 따라 자동 최적화)
-        """
+        """Gemini API 호출 (모델에 따라 자동 최적화)"""
         thinking = is_thinking_model(model_name)
         
         try:
@@ -349,6 +354,7 @@ SNS 캡션도 함께 생성하세요:
         logger.info(f"\n✅ 스크립트 생성 성공!")
         logger.info(f"  제목: {result.get('title', '')}")
         logger.info(f"  스크립트: {result.get('full_script', '')[:80]}...")
+        logger.info(f"  검색 키워드: {result.get('search_keywords', [])}")
         logger.info(f"  인스타 캡션: {'있음' if result.get('instagram_caption') else '기본값'}")
         logger.info(f"  틱톡 캡션: {'있음' if result.get('tiktok_caption') else '기본값'}")
         
@@ -358,7 +364,7 @@ SNS 캡션도 함께 생성하세요:
     # ─── 검증 ───
     
     def _validate_script(self, data):
-        """스크립트 검증 (SNS 캡션 포함)"""
+        """스크립트 검증 (SNS 캡션 + 다중 키워드 포함)"""
         if not isinstance(data, dict):
             logger.warning("검증 실패: dict 아님")
             return False
@@ -410,8 +416,39 @@ SNS 캡션도 함께 생성하세요:
             data['cta'] = '구독과 좋아요 부탁드려요!'
         if not data.get('description'):
             data['description'] = title
-        if not data.get('search_keyword'):
-            data['search_keyword'] = 'psychology brain'
+        
+        # ─── 검색 키워드 (다중) ───
+        # search_keywords가 없으면 search_keyword에서 변환
+        if not data.get('search_keywords'):
+            single = data.get('search_keyword', '')
+            if single:
+                # 단일 키워드가 있으면 그걸 첫번째로 + 기본 2개 추가
+                data['search_keywords'] = [
+                    single,
+                    'abstract dark background',
+                    'cinematic light'
+                ]
+                logger.info(f"  search_keywords: search_keyword에서 변환 → {data['search_keywords']}")
+            else:
+                # 둘 다 없으면 완전 기본값
+                data['search_keywords'] = [
+                    'psychology brain',
+                    'abstract dark background',
+                    'cinematic light'
+                ]
+                logger.info(f"  search_keywords: 기본값 생성")
+        
+        # search_keywords가 리스트가 아닌 경우 (문자열 등)
+        if isinstance(data['search_keywords'], str):
+            data['search_keywords'] = [data['search_keywords'], 'abstract dark background', 'cinematic light']
+            logger.info(f"  search_keywords: 문자열→리스트 변환")
+        
+        # 최소 1개는 있어야 함
+        if not data['search_keywords']:
+            data['search_keywords'] = ['psychology brain', 'abstract dark background', 'cinematic light']
+        
+        # 하위 호환: search_keyword도 유지 (첫번째 값)
+        data['search_keyword'] = data['search_keywords'][0]
         
         # ─── SNS 캡션 기본값 ───
         if not data.get('instagram_caption'):
@@ -440,7 +477,9 @@ SNS 캡션도 함께 생성하세요:
             )
             logger.info("  틱톡 해시태그: 기본값 생성")
         
-        logger.info(f"검증 ✅: '{title}' ({len(data['full_script'])}자, {len(data['subtitle_segments'])}세그먼트)")
+        logger.info(f"검증 ✅: '{title}' ({len(data['full_script'])}자, "
+                     f"{len(data['subtitle_segments'])}세그먼트, "
+                     f"{len(data['search_keywords'])}키워드)")
         return True
     
     def _auto_segments(self, text):
