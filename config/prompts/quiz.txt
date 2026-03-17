@@ -57,7 +57,7 @@
   "cta": "마무리 CTA 1문장",
   "full_script": "전체 나레이션 (hook + body + cta를 자연스럽게 이어붙인 전체 텍스트. 150-250자)",
   "description": "유튜브 설명란 텍스트 (50자 이내)",
-  "search_keyword": "배경영상 검색용 영어 키워드 1개",
+  "search_keywords": ["영어 키워드1", "영어 키워드2", "영어 키워드3"],
   "subtitle_segments": [
     {"text": "후킹 자막", "duration": 3},
     {"text": "핵심정보1 자막 앞부분", "duration": 5},
