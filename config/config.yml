@@ -29,6 +29,7 @@ video:
   max_duration: 55
   width: 1080
   height: 1920
+  fade_duration: 0.5
   fps: 30
   format: "mp4"
   background_opacity: 0.4
@@ -158,6 +159,7 @@ tts:
 background:
   primary_source: "pexels"
   fallback_source: "pixabay"
+  count: 3
   orientation: "portrait"
   min_duration: 10
   per_page: 15
