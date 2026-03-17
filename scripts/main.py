@@ -1,14 +1,13 @@
 #!/usr/bin/env python3
 """
-뇌를 깨우는 30초 - 메인 오케스트레이터 v2
+뇌를 깨우는 30초 - 메인 오케스트레이터 v3
 
-모든 단계를 순차적으로 실행:
 1. 설정 로드
-2. 스크립트 생성 (Gemini)
-3. TTS 음성 생성 (gTTS) → 세그먼트별 타이밍 측정
-4. 배경 영상 다운로드 (Pexels)
+2. 스크립트 생성 (Gemini) → 키워드 3개
+3. TTS 음성 생성 (gTTS) → 자동 배속 + 세그먼트 타이밍
+4. 배경 영상 다운로드 (Pexels) → 3~4개
 5. 자막 생성 (ASS) → TTS 타이밍 기반 싱크
-6. 영상 합성 (FFmpeg) → 음성 기준 길이
+6. 영상 합성 (FFmpeg) → 다중 배경 전환 + 페이드
 7. YouTube 업로드 (옵션)
 8. 텔레그램 알림
 """
@@ -46,7 +45,7 @@ def main():
         setup_logging(level=10)
     
     logger.info("=" * 60)
-    logger.info("🧠 뇌를 깨우는 30초 - YouTube Shorts 자동화 v2")
+    logger.info("🧠 뇌를 깨우는 30초 - YouTube Shorts 자동화 v3")
     logger.info("=" * 60)
     
     config_path = args.config
@@ -87,9 +86,11 @@ def main():
     base_name = f"{date_str}_{language}_{category_id}"
     
     narration_path = str(output_dir / f"{base_name}_narration.mp3")
-    background_path = str(output_dir / f"{base_name}_background.mp4")
+    bg_dir = str(output_dir / "backgrounds")  # 다중 배경 저장 폴더
     subtitle_path = str(output_dir / f"{base_name}_subtitle.ass")
     output_video_path = str(output_dir / f"{base_name}_final.mp4")
+    
+    ensure_dir(Path(bg_dir))
     
     notifier = TelegramNotifier(config)
     
@@ -114,14 +115,20 @@ def main():
         logger.info(f"  스크립트: {script_data.get('full_script', '')[:80]}...")
         logger.info(f"  자막 세그먼트: {len(script_data.get('subtitle_segments', []))}개")
         
-        # ─── Step 2: TTS 음성 생성 (세그먼트별 타이밍 측정) ───
+        # 키워드 확인
+        search_keywords = script_data.get('search_keywords', [])
+        search_keyword = script_data.get('search_keyword', 'abstract background')
+        if not search_keywords:
+            search_keywords = [search_keyword]
+        logger.info(f"  검색 키워드: {search_keywords}")
+        
+        # ─── Step 2: TTS 음성 생성 ───
         logger.info("")
         logger.info("🔊 Step 2: TTS 음성 생성 (gTTS + 자동 배속)")
         logger.info("-" * 40)
         
         tts = TTSGenerator(config)
         
-        # ★ 세그먼트를 전달하여 각 세그먼트별 실제 타이밍 측정
         tts_result = tts.generate(
             text=script_data['full_script'],
             output_path=narration_path,
@@ -129,7 +136,6 @@ def main():
             segments=script_data.get('subtitle_segments'),
         )
         
-        # 반환값 처리 (v3: 3개 반환)
         narration_path = tts_result[0]
         narration_duration = tts_result[1]
         timed_segments = tts_result[2] if len(tts_result) > 2 else None
@@ -138,19 +144,34 @@ def main():
         if timed_segments:
             logger.info(f"  실측 타이밍: {len(timed_segments)}개 세그먼트")
         
-        # ─── Step 3: 배경 영상 다운로드 ───
+        # ─── Step 3: 배경 영상 다운로드 (다중) ───
         logger.info("")
-        logger.info("🎥 Step 3: 배경 영상 다운로드 (Pexels)")
+        logger.info("🎥 Step 3: 배경 영상 다운로드 (Pexels × 3~4개)")
         logger.info("-" * 40)
         
         downloader = VideoDownloader(config)
-        search_keyword = script_data.get('search_keyword', 'abstract background')
         
-        background_path = downloader.download(
-            search_keyword=search_keyword,
-            output_path=background_path,
-            category_id=category_id,
-        )
+        bg_count = config.get('background', 'count', default=3)
+        
+        try:
+            background_paths = downloader.download_multiple(
+                search_keywords=search_keywords,
+                output_dir=bg_dir,
+                category_id=category_id,
+                count=bg_count,
+            )
+            logger.info(f"  배경 영상: {len(background_paths)}개 다운로드")
+        except Exception as e:
+            # 다중 다운로드 실패 시 단일 다운로드로 폴백
+            logger.warning(f"  다중 다운로드 실패: {e}")
+            logger.info("  단일 영상 다운로드로 폴백...")
+            single_bg = str(output_dir / f"{base_name}_background.mp4")
+            downloader.download(
+                search_keyword=search_keywords[0] if search_keywords else 'abstract background',
+                output_path=single_bg,
+                category_id=category_id,
+            )
+            background_paths = [single_bg]
         
         # ─── Step 4: 자막 생성 (TTS 타이밍 기반) ───
         logger.info("")
@@ -163,7 +184,7 @@ def main():
             output_path=subtitle_path,
             language=language,
             total_duration=narration_duration,
-            timed_segments=timed_segments,  # ★ TTS 실측 타이밍 전달
+            timed_segments=timed_segments,
         )
         
         # ─── Step 5: BGM 선택 ───
@@ -172,22 +193,22 @@ def main():
         logger.info("-" * 40)
         
         bgm_config = config.get_bgm_config()
-        bgm_dir = str(get_project_root() / bgm_config.get('directory', 'assets/music'))
-        bgm_path = select_bgm(category_id, bgm_dir)
+        bgm_dir_path = str(get_project_root() / bgm_config.get('directory', 'assets/music'))
+        bgm_path = select_bgm(category_id, bgm_dir_path)
         
         if bgm_path:
             logger.info(f"  BGM: {Path(bgm_path).name}")
         else:
             logger.info("  BGM: 없음 (나레이션만 사용)")
         
-        # ─── Step 6: 영상 합성 ───
+        # ─── Step 6: 영상 합성 (다중 배경) ───
         logger.info("")
-        logger.info("🎬 Step 6: 영상 합성 (FFmpeg)")
+        logger.info("🎬 Step 6: 영상 합성 (다중 배경 전환)")
         logger.info("-" * 40)
         
         composer = VideoComposer(config)
         output_video_path, video_duration = composer.compose(
-            background_path=background_path,
+            background_paths=background_paths,  # ★ 리스트 전달
             narration_path=narration_path,
             subtitle_path=subtitle_path,
             output_path=output_video_path,
@@ -198,7 +219,7 @@ def main():
         logger.info(f"  최종 영상: {output_video_path}")
         logger.info(f"  영상 길이: {video_duration:.1f}초")
         
-        # ─── Step 7: YouTube 업로드 (옵션) ───
+        # ─── Step 7: YouTube 업로드 ───
         if not args.skip_upload and not args.dry_run:
             logger.info("")
             logger.info("📤 Step 7: YouTube 업로드")
@@ -241,7 +262,7 @@ def main():
                 logger.info("  YouTube 업로드 비활성화 (수동 업로드 모드)")
         else:
             logger.info("")
-            logger.info("⏭️ Step 7: YouTube 업로드 건너뜀 (skip-upload/dry-run)")
+            logger.info("⏭️ Step 7: YouTube 업로드 건너뜀")
         
         # ─── Step 8: 텔레그램 알림 ───
         if not args.skip_telegram:
@@ -264,6 +285,7 @@ def main():
         logger.info("✅ 모든 작업 완료!")
         logger.info(f"  📝 제목: {script_data.get('title', '')}")
         logger.info(f"  ⏱ 길이: {video_duration:.1f}초")
+        logger.info(f"  🎥 배경: {len(background_paths)}개 영상 사용")
         logger.info(f"  📁 파일: {output_video_path}")
         if upload_result:
             logger.info(f"  🔗 URL: {upload_result['url']}")
