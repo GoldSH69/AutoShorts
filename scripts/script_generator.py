@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """
-Gemini API 스크립트 생성 - v6 (SNS 캡션 + 다중 키워드)
+Gemini API 스크립트 생성 - v6.1 (SNS 캡션 + 다중 키워드 + 해시태그 정제)
+변경: 인스타 해시태그 5개 제한, #Shorts/#reels/#뇌를깨우는30초 등 플랫폼/채널 태그 자동 제거
 """
 
 import time
@@ -19,11 +20,39 @@ except ImportError:
     raise
 
 
+# ─── 상수 ───
+
 # thinking 모델 판별
 THINKING_MODELS = {
     'gemini-2.5-flash',
     'gemini-2.5-pro',
 }
+
+# 인스타/틱톡에서 제거할 플랫폼/채널 전용 태그 (소문자 비교)
+PLATFORM_TAGS_TO_REMOVE = {
+    "#shorts", "#short", "#youtubeshorts", "#youtube",
+    "#reels", "#reel", "#instagramreels",
+    "#tiktok", "#fyp", "#foryou", "#foryoupage",
+    "#쇼츠", "#유튜브쇼츠", "#유튜브", "#릴스", "#틱톡",
+    "#뇌를깨우는30초",
+}
+
+# 틱톡에서는 허용할 태그
+TIKTOK_ALLOWED_TAGS = {"#fyp", "#foryou", "#foryoupage"}
+
+INSTAGRAM_HASHTAG_LIMIT = 5
+TIKTOK_HASHTAG_LIMIT = 7
+
+# 해시태그 최소 보장용 기본 풀
+DEFAULT_HASHTAGS_KO = [
+    "#심리학", "#자기계발", "#뇌과학", "#마인드셋", "#멘탈",
+    "#psychology", "#mindset", "#selfimprovement",
+]
+
+TIKTOK_DEFAULT_HASHTAGS = [
+    "#심리학", "#자기계발", "#뇌과학", "#fyp", "#psychology", "#mindset",
+]
+
 
 def is_thinking_model(model_name):
     """thinking 모델인지 확인 (lite는 제외)"""
@@ -37,7 +66,7 @@ def is_thinking_model(model_name):
 
 
 class ScriptGenerator:
-    """Gemini 스크립트 생성기 v6 - SNS 캡션 + 다중 키워드"""
+    """Gemini 스크립트 생성기 v6.1 - SNS 캡션 + 다중 키워드 + 해시태그 정제"""
     
     def __init__(self, config):
         self.config = config
@@ -54,10 +83,12 @@ class ScriptGenerator:
         
         self.project_root = get_project_root()
         
-        logger.info(f"ScriptGenerator v6 초기화 (SNS 캡션 + 다중 키워드)")
+        logger.info(f"ScriptGenerator v6.1 초기화 (SNS 캡션 + 다중 키워드 + 해시태그 정제)")
         logger.info(f"  주력 모델: {self.model_name} (thinking: {is_thinking_model(self.model_name)})")
         logger.info(f"  백업 모델: {self.fallback_models}")
         logger.info(f"  max_output_tokens: {self.max_tokens}")
+        logger.info(f"  인스타 해시태그 제한: {INSTAGRAM_HASHTAG_LIMIT}개")
+        logger.info(f"  틱톡 해시태그 제한: {TIKTOK_HASHTAG_LIMIT}개")
     
     # ─── 프롬프트 ───
     
@@ -75,7 +106,7 @@ class ScriptGenerator:
         return self._get_default_prompt(category_id, language)
     
     def _get_default_prompt(self, category_id, language='ko'):
-        """기본 프롬프트 (SNS 캡션 + 다중 키워드 포함)"""
+        """기본 프롬프트 (v6.1 - 인스타 5개 제한, 플랫폼/채널 태그 금지)"""
         category_name = self.config.get_category_name(language=language)
         
         return f"""유튜브 쇼츠 "뇌를 깨우는 30초" 채널의 "{category_name}" 스크립트를 작성하세요.
@@ -96,13 +127,25 @@ search_keywords는 Pexels에서 검색할 영어 키워드 3개를 배열로 생
 - 사람 얼굴 정면보다는 추상적/분위기 있는 영상 키워드 선호
 - 3개가 서로 다른 느낌이어야 함 (다양한 배경 전환을 위해)
 
-SNS 캡션도 함께 생성하세요:
-- instagram_caption: 3~5줄 본문 (이모지 포함, 마지막에 팔로우 유도 CTA)
-- instagram_hashtags: 해시태그 10~15개 (#shorts #심리학 #뇌과학 #뇌를깨우는30초 필수)
-- tiktok_caption: 1~2줄 짧은 후킹 (이모지 포함)
-- tiktok_hashtags: 해시태그 8~10개 (#fyp #틱톡 #심리학 #뇌를깨우는30초 필수)
+SNS 캡션 규칙:
 
-반드시 아래 JSON 형식으로만 출력하세요:
+인스타그램:
+- instagram_caption: 3~5줄 본문 (이모지 포함, 마지막에 팔로우 유도 CTA)
+- instagram_hashtags: 콘텐츠 핵심 해시태그 정확히 5개만 배열로 생성
+  - 콘텐츠 주제와 직접 관련된 구체적 키워드만 사용
+  - 한국어+영어 혼합 가능 (예: "#심리학", "#뇌과학", "#psychology")
+  - 아래 태그는 절대 넣지 말 것:
+    → #shorts #reels #유튜브 #쇼츠 #릴스 #뇌를깨우는30초 (플랫폼/채널명 태그)
+  - 너무 포괄적인 태그 금지 (예: #일상 #공부 #정보)
+
+틱톡:
+- tiktok_caption: 1~2줄 짧은 후킹 (이모지 포함)
+- tiktok_hashtags: 해시태그 5~7개 배열로 생성
+  - #fyp는 틱톡 전용이므로 포함 가능
+  - 아래 태그는 절대 넣지 말 것:
+    → #shorts #유튜브 #쇼츠 #뇌를깨우는30초 (타 플랫폼/채널명 태그)
+
+반드시 아래 JSON 형식으로만 출력하세요. 해시태그는 반드시 배열(리스트)로 출력하세요.
 
 {{
   "title": "영상 제목 (최대 30자)",
@@ -120,9 +163,9 @@ SNS 캡션도 함께 생성하세요:
     {{"text": "자막5", "duration": 3}}
   ],
   "instagram_caption": "인스타그램 본문 3~5줄",
-  "instagram_hashtags": "#심리학 #자기계발 #뇌과학 #shorts #뇌를깨우는30초 ...",
+  "instagram_hashtags": ["#주제태그1", "#주제태그2", "#주제태그3", "#영어태그1", "#영어태그2"],
   "tiktok_caption": "틱톡 후킹 1~2줄",
-  "tiktok_hashtags": "#심리학 #fyp #틱톡 #뇌를깨우는30초 ..."
+  "tiktok_hashtags": ["#주제태그1", "#주제태그2", "#주제태그3", "#fyp", "#영어태그1"]
 }}"""
     
     # ─── 히스토리 ───
@@ -284,6 +327,117 @@ SNS 캡션도 함께 생성하세요:
             logger.error(f"  ❌ 심플 모드도 실패: {e}")
             return None
     
+    # ─── 해시태그 정제 (v6.1 신규) ───
+    
+    def _parse_hashtags_to_list(self, raw):
+        """해시태그를 어떤 형태든 리스트로 변환"""
+        if isinstance(raw, list):
+            result = []
+            for item in raw:
+                if isinstance(item, str):
+                    for tag in item.split():
+                        tag = tag.strip().strip(',')
+                        if tag:
+                            result.append(tag)
+            return result
+        
+        if isinstance(raw, str):
+            tags = re.split(r'[\s,]+', raw)
+            return [t.strip() for t in tags if t.strip()]
+        
+        return []
+    
+    def _sanitize_hashtags(self, raw, limit, platform='instagram'):
+        """
+        해시태그 정제
+        - 어떤 형태든 리스트로 변환
+        - # 접두사 보장
+        - 플랫폼/채널 전용 태그 제거
+        - 틱톡에서는 #fyp 허용
+        - 개수 제한 + 중복 제거
+        """
+        tags = self._parse_hashtags_to_list(raw)
+        
+        cleaned = []
+        seen_lower = set()
+        
+        for tag in tags:
+            if not tag.startswith("#"):
+                tag = f"#{tag}"
+            
+            if len(tag) <= 1:
+                continue
+            
+            tag_lower = tag.lower()
+            
+            if tag_lower in seen_lower:
+                continue
+            
+            if platform == 'instagram':
+                if tag_lower in PLATFORM_TAGS_TO_REMOVE:
+                    logger.debug(f"  인스타 태그 제거: {tag}")
+                    continue
+            elif platform == 'tiktok':
+                if tag_lower in PLATFORM_TAGS_TO_REMOVE and tag_lower not in TIKTOK_ALLOWED_TAGS:
+                    logger.debug(f"  틱톡 태그 제거: {tag}")
+                    continue
+            
+            seen_lower.add(tag_lower)
+            cleaned.append(tag)
+        
+        return cleaned[:limit]
+    
+    def _normalize_sns_captions(self, data):
+        """
+        SNS 캡션 + 해시태그 최종 정규화 (v6.1)
+        - 인스타 해시태그: 정확히 5개 (플랫폼/채널 태그 제거)
+        - 틱톡 해시태그: 5~7개 (#fyp 허용)
+        - 캡션 기본값 보장
+        """
+        
+        # === 인스타그램 해시태그 ===
+        ig_raw = data.get('instagram_hashtags', [])
+        ig_tags = self._sanitize_hashtags(ig_raw, INSTAGRAM_HASHTAG_LIMIT, platform='instagram')
+        
+        if len(ig_tags) < INSTAGRAM_HASHTAG_LIMIT:
+            for default_tag in DEFAULT_HASHTAGS_KO:
+                if default_tag.lower() not in {t.lower() for t in ig_tags}:
+                    ig_tags.append(default_tag)
+                if len(ig_tags) >= INSTAGRAM_HASHTAG_LIMIT:
+                    break
+        
+        data['instagram_hashtags'] = ig_tags[:INSTAGRAM_HASHTAG_LIMIT]
+        logger.info(f"  인스타 해시태그 ({len(data['instagram_hashtags'])}개): {data['instagram_hashtags']}")
+        
+        # === 틱톡 해시태그 ===
+        tt_raw = data.get('tiktok_hashtags', [])
+        tt_tags = self._sanitize_hashtags(tt_raw, TIKTOK_HASHTAG_LIMIT, platform='tiktok')
+        
+        if len(tt_tags) < 5:
+            for default_tag in TIKTOK_DEFAULT_HASHTAGS:
+                if default_tag.lower() not in {t.lower() for t in tt_tags}:
+                    tt_tags.append(default_tag)
+                if len(tt_tags) >= TIKTOK_HASHTAG_LIMIT:
+                    break
+        
+        data['tiktok_hashtags'] = tt_tags[:TIKTOK_HASHTAG_LIMIT]
+        logger.info(f"  틱톡 해시태그 ({len(data['tiktok_hashtags'])}개): {data['tiktok_hashtags']}")
+        
+        # === 캡션 기본값 ===
+        if not data.get('instagram_caption'):
+            data['instagram_caption'] = (
+                f"{data.get('hook', '🧠 당신의 뇌를 깨워보세요')}\n\n"
+                f"{data.get('description', data.get('title', ''))}\n\n"
+                f"👉 팔로우하고 매일 심리학 지식 받아가세요!"
+            )
+            logger.info("  인스타 캡션: 기본값 생성")
+        
+        if not data.get('tiktok_caption'):
+            data['tiktok_caption'] = f"{data.get('hook', '🧠 뇌를 깨우는 30초')} 😳🧠"
+            logger.info("  틱톡 캡션: 기본값 생성")
+        
+        return data
+    
     # ─── 메인 생성 ───
     
     def generate(self, category_id=None, weekday=None, language='ko'):
@@ -356,7 +510,9 @@ SNS 캡션도 함께 생성하세요:
         logger.info(f"  스크립트: {result.get('full_script', '')[:80]}...")
         logger.info(f"  검색 키워드: {result.get('search_keywords', [])}")
         logger.info(f"  인스타 캡션: {'있음' if result.get('instagram_caption') else '기본값'}")
+        logger.info(f"  인스타 해시태그: {result.get('instagram_hashtags', [])} ({len(result.get('instagram_hashtags', []))}개)")
         logger.info(f"  틱톡 캡션: {'있음' if result.get('tiktok_caption') else '기본값'}")
+        logger.info(f"  틱톡 해시태그: {result.get('tiktok_hashtags', [])} ({len(result.get('tiktok_hashtags', []))}개)")
         
         self._save_history(category_id, result)
         return result
@@ -364,7 +520,7 @@ SNS 캡션도 함께 생성하세요:
     # ─── 검증 ───
     
     def _validate_script(self, data):
-        """스크립트 검증 (SNS 캡션 + 다중 키워드 포함)"""
+        """스크립트 검증 (v6.1 - SNS 해시태그 정제 포함)"""
         if not isinstance(data, dict):
             logger.warning("검증 실패: dict 아님")
             return False
@@ -450,36 +606,13 @@ SNS 캡션도 함께 생성하세요:
         # 하위 호환: search_keyword도 유지 (첫번째 값)
         data['search_keyword'] = data['search_keywords'][0]
         
-        # ─── SNS 캡션 기본값 ───
-        if not data.get('instagram_caption'):
-            data['instagram_caption'] = (
-                f"{data['hook']} 🧠\n\n"
-                f"{data.get('description', title)}\n\n"
-                f"👉 팔로우하고 매일 심리학 지식 받아가세요!"
-            )
-            logger.info("  인스타 캡션: 기본값 생성")
-        
-        if not data.get('instagram_hashtags'):
-            data['instagram_hashtags'] = (
-                "#심리학 #뇌과학 #자기계발 #심리해킹 #인간관계 "
-                "#shorts #뇌를깨우는30초 #심리학퀴즈 #멘탈 #마인드셋"
-            )
-            logger.info("  인스타 해시태그: 기본값 생성")
-        
-        if not data.get('tiktok_caption'):
-            data['tiktok_caption'] = f"{data['hook']} 😳🧠"
-            logger.info("  틱톡 캡션: 기본값 생성")
-        
-        if not data.get('tiktok_hashtags'):
-            data['tiktok_hashtags'] = (
-                "#심리학 #뇌과학 #자기계발 #fyp #틱톡 "
-                "#뇌를깨우는30초 #심리해킹 #shorts"
-            )
-            logger.info("  틱톡 해시태그: 기본값 생성")
+        # ─── ★ SNS 캡션 + 해시태그 정규화 (v6.1) ───
+        data = self._normalize_sns_captions(data)
         
         logger.info(f"검증 ✅: '{title}' ({len(data['full_script'])}자, "
                      f"{len(data['subtitle_segments'])}세그먼트, "
-                     f"{len(data['search_keywords'])}키워드)")
+                     f"{len(data['search_keywords'])}키워드, "
+                     f"IG#{len(data['instagram_hashtags'])} TT#{len(data['tiktok_hashtags'])})")
         return True
     
     def _auto_segments(self, text):
