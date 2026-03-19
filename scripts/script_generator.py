@@ -435,6 +435,10 @@ SNS 캡션 규칙:
         if not data.get('tiktok_caption'):
             data['tiktok_caption'] = f"{data.get('hook', '🧠 뇌를 깨우는 30초')} 😳🧠"
             logger.info("  틱톡 캡션: 기본값 생성")
+
+        # ★ 이 2줄이 핵심 (리스트 → 문자열 변환)
+        data['instagram_hashtags'] = ' '.join(ig_tags)
+        data['tiktok_hashtags'] = ' '.join(tt_tags)
         
         return data
     
