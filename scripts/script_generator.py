@@ -613,10 +613,12 @@ SNS 캡션 규칙:
         # ─── ★ SNS 캡션 + 해시태그 정규화 (v6.1) ───
         data = self._normalize_sns_captions(data)
         
+        ig_count = len(data['instagram_hashtags'].split()) if isinstance(data['instagram_hashtags'], str) else len(data['instagram_hashtags'])
+        tt_count = len(data['tiktok_hashtags'].split()) if isinstance(data['tiktok_hashtags'], str) else len(data['tiktok_hashtags'])
         logger.info(f"검증 ✅: '{title}' ({len(data['full_script'])}자, "
                      f"{len(data['subtitle_segments'])}세그먼트, "
                      f"{len(data['search_keywords'])}키워드, "
-                     f"IG#{len(data['instagram_hashtags'])} TT#{len(data['tiktok_hashtags'])})")
+                     f"IG#{ig_count} TT#{tt_count})")
         return True
     
     def _auto_segments(self, text):
