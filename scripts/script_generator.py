@@ -470,6 +470,25 @@ SNS 캡션 규칙:
         if overlap:
             logger.info(f"  인스타/틱톡 겹침: {len(overlap)}개 {overlap}")
         
+        # ★ 캡션 본문에서 해시태그 줄 제거 (해시태그는 별도 필드로 관리)
+        for platform in ['instagram_caption', 'tiktok_caption']:
+            caption = data.get(platform, '')
+            if caption:
+                # 해시태그만으로 이루어진 줄 제거
+                lines = caption.split('\n')
+                cleaned_lines = []
+                for line in lines:
+                    stripped = line.strip()
+                    # 줄 전체가 해시태그로만 구성된 경우 제거
+                    if stripped and all(word.startswith('#') for word in stripped.split() if word):
+                        logger.info(f"  {platform}에서 해시태그 줄 제거: {stripped}")
+                        continue
+                    cleaned_lines.append(line)
+                # 끝부분 빈줄 정리
+                while cleaned_lines and not cleaned_lines[-1].strip():
+                    cleaned_lines.pop()
+                data[platform] = '\n'.join(cleaned_lines)
+
         # === 캡션 기본값 ===
         if not data.get('instagram_caption'):
             data['instagram_caption'] = (
