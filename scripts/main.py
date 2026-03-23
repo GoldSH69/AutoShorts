@@ -64,18 +64,27 @@ def main():
         weekday = args.weekday
     else:
         weekday = get_weekday()
-    
-    if args.category and args.category != 'auto':
-        category_override = args.category
-        for day_num in range(7):
-            cat = config.get_today_category(day_num)
-            if cat.get('id') == category_override:
-                weekday = day_num
-                break
-    
-    category_id = config.get_category_id(weekday)
-    category_name = config.get_category_name(weekday, language)
-    category_emoji = config.get_category_emoji(weekday)
+        # 카테고리 결정
+        category_override = None
+        if args.category and args.category != 'auto':
+            category_override = args.category
+            
+            found = False
+            for day_num in range(7):
+                cat = config.get_today_category(day_num)
+                if cat.get('id') == category_override:
+                    weekday = day_num
+                    found = True
+                    logger.info(f"  카테고리 '{category_override}' → 요일 {day_num}")
+                    break
+            
+            if not found:
+                logger.warning(f"  ⚠️ 카테고리 '{category_override}'가 config에 없음!")
+                logger.warning(f"  등록된 카테고리: {[config.get_today_category(d).get('id') for d in range(7)]}")
+        
+        category_id = category_override if category_override else config.get_category_id(weekday)
+        category_name = config.get_category_name(weekday, language)
+        category_emoji = config.get_category_emoji(weekday)
     
     logger.info(f"📅 날짜: {get_today_str()} ({get_weekday_name_ko()})")
     logger.info(f"🌐 언어: {language}")
