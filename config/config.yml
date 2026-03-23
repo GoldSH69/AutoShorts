@@ -97,17 +97,18 @@ categories:
       - "growth plant"
       - "morning routine"
   5:
-    id: "mbti"
-    name_ko: "MBTI 성격 유형 심리학"
-    name_en: "MBTI Personality Psychology"
-    emoji: "🎭"
-    hashtags_ko: "#MBTI #성격유형 #심리 #shorts #INTJ #ENFP #성격테스트"
-    hashtags_en: "#MBTI #personality #psychology #shorts #personalitytype"
-    search_terms:
-      - "people crowd diverse"
-      - "personality face"
-      - "colorful abstract"
-      - "social interaction"
+      5:
+      id: "mbti"
+      name_ko: "MBTI 성격 유형 심리학"
+      name_en: "MBTI Personality Psychology"
+      emoji: "🎭"
+      hashtags_ko: "#MBTI #성격유형 #심리 #shorts #INTJ #ENFP #성격테스트"
+      hashtags_en: "#MBTI #personality #psychology #shorts #personalitytype"
+      search_terms:
+        - "people crowd diverse"
+        - "personality face"
+        - "colorful abstract"
+        - "social interaction"
   6:
     id: "relationship"
     name_ko: "관계의 심리학"

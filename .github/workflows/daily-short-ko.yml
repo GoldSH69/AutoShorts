@@ -18,7 +18,7 @@ on:
           - brain
           - dark
           - hack
-          - mbti
+          - love
           - relationship
       weekday_override:
         description: '요일 강제 지정 (0=월~6=일, 빈값=자동)'

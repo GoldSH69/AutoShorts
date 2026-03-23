@@ -18,7 +18,7 @@ on:
           - brain
           - dark
           - hack
-          - mbti
+          - love
           - relationship
       skip_upload:
         description: 'Skip YouTube upload'

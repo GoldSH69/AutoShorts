@@ -387,41 +387,88 @@ SNS 캡션 규칙:
         
         return cleaned[:limit]
     
+    def _deduplicate_cross_platform(self, ig_tags: list, tt_tags: list, max_overlap: int = 2) -> tuple:
+        """
+        인스타/틱톡 간 교차 중복 최소화 (v6.2)
+        - 인스타 태그는 그대로 유지
+        - 틱톡에서 인스타와 겹치는 태그를 max_overlap개까지만 허용
+        - 초과분은 제거
+        """
+        ig_lower_set = set(tag.lower() for tag in ig_tags)
+        
+        overlap_count = 0
+        filtered_tt = []
+        removed = []
+        
+        for tag in tt_tags:
+            if tag.lower() in ig_lower_set:
+                overlap_count += 1
+                if overlap_count <= max_overlap:
+                    filtered_tt.append(tag)
+                else:
+                    removed.append(tag)
+            else:
+                filtered_tt.append(tag)
+        
+        if removed:
+            logger.info(f"  교차 중복 제거 (틱톡에서): {removed}")
+        
+        return ig_tags, filtered_tt
+    
     def _normalize_sns_captions(self, data):
         """
-        SNS 캡션 + 해시태그 최종 정규화 (v6.1)
+        SNS 캡션 + 해시태그 최종 정규화 (v6.2)
         - 인스타 해시태그: 정확히 5개 (플랫폼/채널 태그 제거)
         - 틱톡 해시태그: 5~7개 (#fyp 허용)
+        - ★ 인스타/틱톡 교차 중복 최소화 (최대 2개 겹침)
         - 캡션 기본값 보장
+        - 최종 출력: 문자열 (' '.join)
         """
         
         # === 인스타그램 해시태그 ===
         ig_raw = data.get('instagram_hashtags', [])
         ig_tags = self._sanitize_hashtags(ig_raw, INSTAGRAM_HASHTAG_LIMIT, platform='instagram')
         
+        # 부족하면 기본값에서 채움
         if len(ig_tags) < INSTAGRAM_HASHTAG_LIMIT:
             for default_tag in DEFAULT_HASHTAGS_KO:
                 if default_tag.lower() not in {t.lower() for t in ig_tags}:
                     ig_tags.append(default_tag)
                 if len(ig_tags) >= INSTAGRAM_HASHTAG_LIMIT:
                     break
-        
-        data['instagram_hashtags'] = ig_tags[:INSTAGRAM_HASHTAG_LIMIT]
-        logger.info(f"  인스타 해시태그 ({len(data['instagram_hashtags'])}개): {data['instagram_hashtags']}")
+        ig_tags = ig_tags[:INSTAGRAM_HASHTAG_LIMIT]
         
         # === 틱톡 해시태그 ===
         tt_raw = data.get('tiktok_hashtags', [])
         tt_tags = self._sanitize_hashtags(tt_raw, TIKTOK_HASHTAG_LIMIT, platform='tiktok')
         
+        # ★ 교차 중복 제거 (인스타와 최대 2개만 겹침 허용)
+        ig_tags, tt_tags = self._deduplicate_cross_platform(ig_tags, tt_tags, max_overlap=2)
+        
+        # 틱톡 부족하면 기본값에서 채움 (교차 중복 제거 후 부족해질 수 있음)
         if len(tt_tags) < 5:
+            ig_lower_set = set(t.lower() for t in ig_tags)
+            tt_lower_set = set(t.lower() for t in tt_tags)
             for default_tag in TIKTOK_DEFAULT_HASHTAGS:
-                if default_tag.lower() not in {t.lower() for t in tt_tags}:
-                    tt_tags.append(default_tag)
+                if default_tag.lower() not in tt_lower_set:
+                    # 인스타와 또 겹치는지 체크 (최소 3개까지는 허용)
+                    if default_tag.lower() not in ig_lower_set or len(tt_tags) < 3:
+                        tt_tags.append(default_tag)
+                        tt_lower_set.add(default_tag.lower())
                 if len(tt_tags) >= TIKTOK_HASHTAG_LIMIT:
                     break
+        tt_tags = tt_tags[:TIKTOK_HASHTAG_LIMIT]
         
-        data['tiktok_hashtags'] = tt_tags[:TIKTOK_HASHTAG_LIMIT]
-        logger.info(f"  틱톡 해시태그 ({len(data['tiktok_hashtags'])}개): {data['tiktok_hashtags']}")
+        # 로그
+        data['instagram_hashtags'] = ig_tags
+        data['tiktok_hashtags'] = tt_tags
+        logger.info(f"  인스타 해시태그 ({len(ig_tags)}개): {ig_tags}")
+        logger.info(f"  틱톡 해시태그 ({len(tt_tags)}개): {tt_tags}")
+        
+        # 교차 중복 현황 로그
+        overlap = set(t.lower() for t in ig_tags) & set(t.lower() for t in tt_tags)
+        if overlap:
+            logger.info(f"  인스타/틱톡 겹침: {len(overlap)}개 {overlap}")
         
         # === 캡션 기본값 ===
         if not data.get('instagram_caption'):
@@ -435,8 +482,8 @@ SNS 캡션 규칙:
         if not data.get('tiktok_caption'):
             data['tiktok_caption'] = f"{data.get('hook', '🧠 뇌를 깨우는 30초')} 😳🧠"
             logger.info("  틱톡 캡션: 기본값 생성")
-
-        # ★ 이 2줄이 핵심 (리스트 → 문자열 변환)
+        
+        # ★ 최종: 리스트 → 문자열 변환 (텔레그램 복붙 편의)
         data['instagram_hashtags'] = ' '.join(ig_tags)
         data['tiktok_hashtags'] = ' '.join(tt_tags)
         

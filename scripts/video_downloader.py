@@ -37,10 +37,10 @@ CATEGORY_KEYWORDS = {
         'sunrise motivation', 'running shoes', 'meditation nature',
         'goal planning', 'book reading', 'morning alarm'
     ],
-    'mbti': [
-        'personality diverse', 'crowd different people', 'mirror face',
-        'colorful abstract', 'puzzle pieces', 'social gathering',
-        'introvert alone', 'extrovert party', 'emotion face'
+    'love': [
+        'couple silhouette sunset', 'romantic city lights', 'coffee date aesthetic',
+        'holding hands close up', 'candlelight dinner', 'walking together evening',
+        'heart bokeh lights', 'love letter vintage', 'sunset beach couple'
     ],
     'relationship': [
         'couple silhouette', 'conversation cafe', 'holding hands',

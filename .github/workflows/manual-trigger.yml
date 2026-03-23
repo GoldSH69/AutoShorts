@@ -23,7 +23,7 @@ on:
           - brain
           - dark
           - hack
-          - mbti
+          - love
           - relationship
       dry_run:
         description: '테스트 모드 (업로드 안함)'
