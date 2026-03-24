@@ -95,6 +95,7 @@ class Config:
         return {
             'engine': base.get('engine', 'gtts'),
             'speed_factor': base.get('speed_factor', 1.05),
+            'max_speed': base.get('max_speed', 1.50),
             'silence_ms': base.get('silence_between_sentences_ms', 300),
             'lang': lang_config.get('lang', language),
             'tld': lang_config.get('tld', 'com'),
@@ -166,6 +167,10 @@ def parse_args():
     parser.add_argument('--dry-run',
                        action='store_true',
                        help='테스트 모드 (영상 생성만, 업로드 안함)')
+    
+    parser.add_argument('--no-history',
+                       action='store_true',
+                       help='히스토리 저장 안함 (테스트 시 오염 방지)')
     
     parser.add_argument('--debug',
                        action='store_true',
