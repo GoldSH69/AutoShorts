@@ -531,7 +531,7 @@ SNS 캡션 규칙:
     
     # ─── 메인 생성 ───
     
-    def generate(self, category_id=None, weekday=None, language='ko'):
+    def generate(self, category_id=None, weekday=None, language='ko', save_history=True):
         """스크립트 생성"""
         
         if category_id is None:
@@ -605,7 +605,10 @@ SNS 캡션 규칙:
         logger.info(f"  틱톡 캡션: {'있음' if result.get('tiktok_caption') else '기본값'}")
         logger.info(f"  틱톡 해시태그: {result.get('tiktok_hashtags', '')}")
         
-        self._save_history(category_id, result)
+        if save_history:
+            self._save_history(category_id, result)
+        else:
+            logger.info("🚫 히스토리 저장 건너뜀 (--no-history)")
         return result
     
     # ─── 검증 ───
