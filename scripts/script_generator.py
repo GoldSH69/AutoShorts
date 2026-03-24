@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Gemini API 스크립트 생성 - v6.1 (SNS 캡션 + 다중 키워드 + 해시태그 정제)
-변경: 인스타 해시태그 5개 제한, #Shorts/#reels/#뇌를깨우는30초 등 플랫폼/채널 태그 자동 제거
+Gemini API 스크립트 생성 - v6.3 (SNS 캡션 해시태그 완전 제거 강화)
+변경: 캡션 본문 내 모든 #해시태그 패턴 제거 (줄 끝/본문 중간 모두 대응)
 """
 
 import time
@@ -66,7 +66,7 @@ def is_thinking_model(model_name):
 
 
 class ScriptGenerator:
-    """Gemini 스크립트 생성기 v6.1 - SNS 캡션 + 다중 키워드 + 해시태그 정제"""
+    """Gemini 스크립트 생성기 v6.3 - SNS 캡션 해시태그 완전 제거"""
     
     def __init__(self, config):
         self.config = config
@@ -83,7 +83,7 @@ class ScriptGenerator:
         
         self.project_root = get_project_root()
         
-        logger.info(f"ScriptGenerator v6.1 초기화 (SNS 캡션 + 다중 키워드 + 해시태그 정제)")
+        logger.info(f"ScriptGenerator v6.3 초기화 (캡션 해시태그 완전 제거)")
         logger.info(f"  주력 모델: {self.model_name} (thinking: {is_thinking_model(self.model_name)})")
         logger.info(f"  백업 모델: {self.fallback_models}")
         logger.info(f"  max_output_tokens: {self.max_tokens}")
@@ -106,7 +106,7 @@ class ScriptGenerator:
         return self._get_default_prompt(category_id, language)
     
     def _get_default_prompt(self, category_id, language='ko'):
-        """기본 프롬프트 (v6.1 - 인스타 5개 제한, 플랫폼/채널 태그 금지)"""
+        """기본 프롬프트 (v6.3 - 캡션 본문 해시태그 금지 강화)"""
         category_name = self.config.get_category_name(language=language)
         
         return f"""유튜브 쇼츠 "뇌를 깨우는 30초" 채널의 "{category_name}" 스크립트를 작성하세요.
@@ -129,8 +129,12 @@ search_keywords는 Pexels에서 검색할 영어 키워드 3개를 배열로 생
 
 SNS 캡션 규칙:
 
+⚠️ 중요: instagram_caption과 tiktok_caption 본문에는 #해시태그를 절대 넣지 마세요!
+해시태그는 반드시 instagram_hashtags, tiktok_hashtags 필드에만 넣으세요.
+
 인스타그램:
 - instagram_caption: 3~5줄 본문 (이모지 포함, 마지막에 팔로우 유도 CTA)
+  ⚠️ 본문에 #해시태그 넣지 말 것!
 - instagram_hashtags: 콘텐츠 핵심 해시태그 정확히 5개만 배열로 생성
   - 콘텐츠 주제와 직접 관련된 구체적 키워드만 사용
   - 한국어+영어 혼합 가능 (예: "#심리학", "#뇌과학", "#psychology")
@@ -140,6 +144,7 @@ SNS 캡션 규칙:
 
 틱톡:
 - tiktok_caption: 1~2줄 짧은 후킹 (이모지 포함)
+  ⚠️ 본문에 #해시태그 넣지 말 것!
 - tiktok_hashtags: 해시태그 5~7개 배열로 생성
   - #fyp는 틱톡 전용이므로 포함 가능
   - 아래 태그는 절대 넣지 말 것:
@@ -162,9 +167,9 @@ SNS 캡션 규칙:
     {{"text": "자막4", "duration": 4}},
     {{"text": "자막5", "duration": 3}}
   ],
-  "instagram_caption": "인스타그램 본문 3~5줄",
+  "instagram_caption": "인스타그램 본문 3~5줄 (해시태그 넣지 말 것)",
   "instagram_hashtags": ["#주제태그1", "#주제태그2", "#주제태그3", "#영어태그1", "#영어태그2"],
-  "tiktok_caption": "틱톡 후킹 1~2줄",
+  "tiktok_caption": "틱톡 후킹 1~2줄 (해시태그 넣지 말 것)",
   "tiktok_hashtags": ["#주제태그1", "#주제태그2", "#주제태그3", "#fyp", "#영어태그1"]
 }}"""
     
@@ -327,7 +332,7 @@ SNS 캡션 규칙:
             logger.error(f"  ❌ 심플 모드도 실패: {e}")
             return None
     
-    # ─── 해시태그 정제 (v6.1 신규) ───
+    # ─── 해시태그 정제 ───
     
     def _parse_hashtags_to_list(self, raw):
         """해시태그를 어떤 형태든 리스트로 변환"""
@@ -389,10 +394,9 @@ SNS 캡션 규칙:
     
     def _deduplicate_cross_platform(self, ig_tags: list, tt_tags: list, max_overlap: int = 2) -> tuple:
         """
-        인스타/틱톡 간 교차 중복 최소화 (v6.2)
+        인스타/틱톡 간 교차 중복 최소화
         - 인스타 태그는 그대로 유지
         - 틱톡에서 인스타와 겹치는 태그를 max_overlap개까지만 허용
-        - 초과분은 제거
         """
         ig_lower_set = set(tag.lower() for tag in ig_tags)
         
@@ -415,21 +419,59 @@ SNS 캡션 규칙:
         
         return ig_tags, filtered_tt
     
+    def _strip_hashtags_from_caption(self, caption, platform_name):
+        """
+        🆕 v6.3 캡션 본문에서 모든 #해시태그 완전 제거
+        - 줄 전체가 해시태그 → 줄 삭제
+        - 줄 끝에 해시태그 → 해시태그만 제거
+        - 본문 중간 해시태그 → 해시태그만 제거
+        모든 패턴 대응!
+        """
+        if not caption:
+            return caption
+        
+        original = caption
+        
+        # 모든 #해시태그 단어 제거 (유니코드 대응: 한글/영문/숫자/언더스코어)
+        caption = re.sub(r'#[^\s#]+', '', caption)
+        
+        # 연속 공백 정리
+        caption = re.sub(r'[ \t]{2,}', ' ', caption)
+        
+        # 각 줄 앞뒤 공백 정리 + 빈줄 제거
+        lines = [line.strip() for line in caption.split('\n')]
+        lines = [line for line in lines if line]
+        
+        caption = '\n'.join(lines)
+        
+        if caption != original:
+            logger.info(f"  ✂️ {platform_name} 캡션에서 해시태그 제거 완료")
+        
+        return caption
+    
     def _normalize_sns_captions(self, data):
         """
-        SNS 캡션 + 해시태그 최종 정규화 (v6.2)
+        SNS 캡션 + 해시태그 최종 정규화 (v6.3)
+        - ★ 캡션 본문에서 모든 해시태그 완전 제거 (줄끝/중간/전체줄 모두)
         - 인스타 해시태그: 정확히 5개 (플랫폼/채널 태그 제거)
         - 틱톡 해시태그: 5~7개 (#fyp 허용)
-        - ★ 인스타/틱톡 교차 중복 최소화 (최대 2개 겹침)
+        - 인스타/틱톡 교차 중복 최소화 (최대 2개 겹침)
         - 캡션 기본값 보장
         - 최종 출력: 문자열 (' '.join)
         """
         
-        # === 인스타그램 해시태그 ===
+        # ★ [1단계] 캡션 본문에서 해시태그 완전 제거 (v6.3 핵심 변경)
+        data['instagram_caption'] = self._strip_hashtags_from_caption(
+            data.get('instagram_caption', ''), 'instagram'
+        )
+        data['tiktok_caption'] = self._strip_hashtags_from_caption(
+            data.get('tiktok_caption', ''), 'tiktok'
+        )
+        
+        # === [2단계] 인스타그램 해시태그 ===
         ig_raw = data.get('instagram_hashtags', [])
         ig_tags = self._sanitize_hashtags(ig_raw, INSTAGRAM_HASHTAG_LIMIT, platform='instagram')
         
-        # 부족하면 기본값에서 채움
         if len(ig_tags) < INSTAGRAM_HASHTAG_LIMIT:
             for default_tag in DEFAULT_HASHTAGS_KO:
                 if default_tag.lower() not in {t.lower() for t in ig_tags}:
@@ -438,20 +480,19 @@ SNS 캡션 규칙:
                     break
         ig_tags = ig_tags[:INSTAGRAM_HASHTAG_LIMIT]
         
-        # === 틱톡 해시태그 ===
+        # === [3단계] 틱톡 해시태그 ===
         tt_raw = data.get('tiktok_hashtags', [])
         tt_tags = self._sanitize_hashtags(tt_raw, TIKTOK_HASHTAG_LIMIT, platform='tiktok')
         
-        # ★ 교차 중복 제거 (인스타와 최대 2개만 겹침 허용)
+        # ★ 교차 중복 제거
         ig_tags, tt_tags = self._deduplicate_cross_platform(ig_tags, tt_tags, max_overlap=2)
         
-        # 틱톡 부족하면 기본값에서 채움 (교차 중복 제거 후 부족해질 수 있음)
+        # 틱톡 부족하면 기본값에서 채움
         if len(tt_tags) < 5:
             ig_lower_set = set(t.lower() for t in ig_tags)
             tt_lower_set = set(t.lower() for t in tt_tags)
             for default_tag in TIKTOK_DEFAULT_HASHTAGS:
                 if default_tag.lower() not in tt_lower_set:
-                    # 인스타와 또 겹치는지 체크 (최소 3개까지는 허용)
                     if default_tag.lower() not in ig_lower_set or len(tt_tags) < 3:
                         tt_tags.append(default_tag)
                         tt_lower_set.add(default_tag.lower())
@@ -465,31 +506,11 @@ SNS 캡션 규칙:
         logger.info(f"  인스타 해시태그 ({len(ig_tags)}개): {ig_tags}")
         logger.info(f"  틱톡 해시태그 ({len(tt_tags)}개): {tt_tags}")
         
-        # 교차 중복 현황 로그
         overlap = set(t.lower() for t in ig_tags) & set(t.lower() for t in tt_tags)
         if overlap:
             logger.info(f"  인스타/틱톡 겹침: {len(overlap)}개 {overlap}")
         
-        # ★ 캡션 본문에서 해시태그 줄 제거 (해시태그는 별도 필드로 관리)
-        for platform in ['instagram_caption', 'tiktok_caption']:
-            caption = data.get(platform, '')
-            if caption:
-                # 해시태그만으로 이루어진 줄 제거
-                lines = caption.split('\n')
-                cleaned_lines = []
-                for line in lines:
-                    stripped = line.strip()
-                    # 줄 전체가 해시태그로만 구성된 경우 제거
-                    if stripped and all(word.startswith('#') for word in stripped.split() if word):
-                        logger.info(f"  {platform}에서 해시태그 줄 제거: {stripped}")
-                        continue
-                    cleaned_lines.append(line)
-                # 끝부분 빈줄 정리
-                while cleaned_lines and not cleaned_lines[-1].strip():
-                    cleaned_lines.pop()
-                data[platform] = '\n'.join(cleaned_lines)
-
-        # === 캡션 기본값 ===
+        # === [4단계] 캡션 기본값 ===
         if not data.get('instagram_caption'):
             data['instagram_caption'] = (
                 f"{data.get('hook', '🧠 당신의 뇌를 깨워보세요')}\n\n"
@@ -502,7 +523,7 @@ SNS 캡션 규칙:
             data['tiktok_caption'] = f"{data.get('hook', '🧠 뇌를 깨우는 30초')} 😳🧠"
             logger.info("  틱톡 캡션: 기본값 생성")
         
-        # ★ 최종: 리스트 → 문자열 변환 (텔레그램 복붙 편의)
+        # ★ 최종: 리스트 → 문자열 변환
         data['instagram_hashtags'] = ' '.join(ig_tags)
         data['tiktok_hashtags'] = ' '.join(tt_tags)
         
@@ -580,9 +601,9 @@ SNS 캡션 규칙:
         logger.info(f"  스크립트: {result.get('full_script', '')[:80]}...")
         logger.info(f"  검색 키워드: {result.get('search_keywords', [])}")
         logger.info(f"  인스타 캡션: {'있음' if result.get('instagram_caption') else '기본값'}")
-        logger.info(f"  인스타 해시태그: {result.get('instagram_hashtags', [])} ({len(result.get('instagram_hashtags', []))}개)")
+        logger.info(f"  인스타 해시태그: {result.get('instagram_hashtags', '')} ")
         logger.info(f"  틱톡 캡션: {'있음' if result.get('tiktok_caption') else '기본값'}")
-        logger.info(f"  틱톡 해시태그: {result.get('tiktok_hashtags', [])} ({len(result.get('tiktok_hashtags', []))}개)")
+        logger.info(f"  틱톡 해시태그: {result.get('tiktok_hashtags', '')}")
         
         self._save_history(category_id, result)
         return result
@@ -590,7 +611,7 @@ SNS 캡션 규칙:
     # ─── 검증 ───
     
     def _validate_script(self, data):
-        """스크립트 검증 (v6.1 - SNS 해시태그 정제 포함)"""
+        """스크립트 검증 (v6.3 - 캡션 해시태그 완전 제거)"""
         if not isinstance(data, dict):
             logger.warning("검증 실패: dict 아님")
             return False
@@ -633,7 +654,7 @@ SNS 캡션 규칙:
             else:
                 data['subtitle_segments'] = self._auto_segments(script)
         
-        # 기본값 채우기 (기존 필드)
+        # 기본값 채우기
         if not data.get('hook'):
             data['hook'] = script[:50]
         if not data.get('body'):
@@ -644,11 +665,9 @@ SNS 캡션 규칙:
             data['description'] = title
         
         # ─── 검색 키워드 (다중) ───
-        # search_keywords가 없으면 search_keyword에서 변환
         if not data.get('search_keywords'):
             single = data.get('search_keyword', '')
             if single:
-                # 단일 키워드가 있으면 그걸 첫번째로 + 기본 2개 추가
                 data['search_keywords'] = [
                     single,
                     'abstract dark background',
@@ -656,7 +675,6 @@ SNS 캡션 규칙:
                 ]
                 logger.info(f"  search_keywords: search_keyword에서 변환 → {data['search_keywords']}")
             else:
-                # 둘 다 없으면 완전 기본값
                 data['search_keywords'] = [
                     'psychology brain',
                     'abstract dark background',
@@ -664,19 +682,16 @@ SNS 캡션 규칙:
                 ]
                 logger.info(f"  search_keywords: 기본값 생성")
         
-        # search_keywords가 리스트가 아닌 경우 (문자열 등)
         if isinstance(data['search_keywords'], str):
             data['search_keywords'] = [data['search_keywords'], 'abstract dark background', 'cinematic light']
             logger.info(f"  search_keywords: 문자열→리스트 변환")
         
-        # 최소 1개는 있어야 함
         if not data['search_keywords']:
             data['search_keywords'] = ['psychology brain', 'abstract dark background', 'cinematic light']
         
-        # 하위 호환: search_keyword도 유지 (첫번째 값)
         data['search_keyword'] = data['search_keywords'][0]
         
-        # ─── ★ SNS 캡션 + 해시태그 정규화 (v6.1) ───
+        # ─── ★ SNS 캡션 + 해시태그 정규화 (v6.3) ───
         data = self._normalize_sns_captions(data)
         
         ig_count = len(data['instagram_hashtags'].split()) if isinstance(data['instagram_hashtags'], str) else len(data['instagram_hashtags'])
