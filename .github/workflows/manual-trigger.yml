@@ -30,6 +30,11 @@ on:
         required: false
         default: true
         type: boolean
+      save_history:
+        description: '히스토리 저장 (테스트 시 OFF 권장)'
+        required: false
+        default: false
+        type: boolean
       debug:
         description: '디버그 모드'
         required: false
@@ -100,6 +105,11 @@ jobs:
             ARGS="$ARGS --skip-upload"
           fi
           
+          # 🆕 히스토리 저장 여부
+          if [ "${{ github.event.inputs.save_history }}" != "true" ]; then
+            ARGS="$ARGS --no-history"
+          fi
+          
           if [ "${{ github.event.inputs.debug }}" = "true" ]; then
             ARGS="$ARGS --debug"
           fi
@@ -116,13 +126,13 @@ jobs:
           echo "=== history ==="
           cat history/generated_topics.json 2>/dev/null || echo "비어있음"
 
+      # 🆕 히스토리 저장 ON일 때만 커밋
       - name: 📝 Update history
-        if: success()
+        if: success() && github.event.inputs.save_history == 'true'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           
-          # 변경사항 확인
           echo "=== git status ==="
           git status
           
