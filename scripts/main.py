@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-뇌를 깨우는 30초 - 메인 오케스트레이터 v3
+뇌를 깨우는 30초 - 메인 오케스트레이터 v3.1
 
 1. 설정 로드
 2. 스크립트 생성 (Gemini) → 키워드 3개
@@ -45,7 +45,7 @@ def main():
         setup_logging(level=10)
     
     logger.info("=" * 60)
-    logger.info("🧠 뇌를 깨우는 30초 - YouTube Shorts 자동화 v3")
+    logger.info("🧠 뇌를 깨우는 30초 - YouTube Shorts 자동화 v3.1")
     logger.info("=" * 60)
     
     config_path = args.config
@@ -56,6 +56,11 @@ def main():
     
     language = args.language
     
+    # 🆕 히스토리 저장 여부
+    save_history = not args.no_history
+    if not save_history:
+        logger.info("🚫 히스토리 저장 OFF (--no-history)")
+    
     if not config.is_channel_enabled(language):
         logger.warning(f"채널이 비활성화 상태입니다: {language}")
         return
@@ -64,38 +69,40 @@ def main():
         weekday = args.weekday
     else:
         weekday = get_weekday()
-        # 카테고리 결정
-        category_override = None
-        if args.category and args.category != 'auto':
-            category_override = args.category
-            
-            found = False
-            for day_num in range(7):
-                cat = config.get_today_category(day_num)
-                if cat.get('id') == category_override:
-                    weekday = day_num
-                    found = True
-                    logger.info(f"  카테고리 '{category_override}' → 요일 {day_num}")
-                    break
-            
-            if not found:
-                logger.warning(f"  ⚠️ 카테고리 '{category_override}'가 config에 없음!")
-                logger.warning(f"  등록된 카테고리: {[config.get_today_category(d).get('id') for d in range(7)]}")
+    
+    # 카테고리 결정
+    category_override = None
+    if args.category and args.category != 'auto':
+        category_override = args.category
         
-        category_id = category_override if category_override else config.get_category_id(weekday)
-        category_name = config.get_category_name(weekday, language)
-        category_emoji = config.get_category_emoji(weekday)
+        found = False
+        for day_num in range(7):
+            cat = config.get_today_category(day_num)
+            if cat.get('id') == category_override:
+                weekday = day_num
+                found = True
+                logger.info(f"  카테고리 '{category_override}' → 요일 {day_num}")
+                break
+        
+        if not found:
+            logger.warning(f"  ⚠️ 카테고리 '{category_override}'가 config에 없음!")
+            logger.warning(f"  등록된 카테고리: {[config.get_today_category(d).get('id') for d in range(7)]}")
+    
+    category_id = category_override if category_override else config.get_category_id(weekday)
+    category_name = config.get_category_name(weekday, language)
+    category_emoji = config.get_category_emoji(weekday)
     
     logger.info(f"📅 날짜: {get_today_str()} ({get_weekday_name_ko()})")
     logger.info(f"🌐 언어: {language}")
     logger.info(f"📂 카테고리: {category_emoji} {category_name} ({category_id})")
+    logger.info(f"📝 히스토리: {'저장' if save_history else '저장 안함 (테스트)'}")
     
     output_dir = get_output_dir()
     date_str = get_today_str()
     base_name = f"{date_str}_{language}_{category_id}"
     
     narration_path = str(output_dir / f"{base_name}_narration.mp3")
-    bg_dir = str(output_dir / "backgrounds")  # 다중 배경 저장 폴더
+    bg_dir = str(output_dir / "backgrounds")
     subtitle_path = str(output_dir / f"{base_name}_subtitle.ass")
     output_video_path = str(output_dir / f"{base_name}_final.mp4")
     
@@ -118,6 +125,7 @@ def main():
             category_id=category_id,
             weekday=weekday,
             language=language,
+            save_history=save_history,
         )
         
         logger.info(f"  제목: {script_data.get('title', '')}")
@@ -171,7 +179,6 @@ def main():
             )
             logger.info(f"  배경 영상: {len(background_paths)}개 다운로드")
         except Exception as e:
-            # 다중 다운로드 실패 시 단일 다운로드로 폴백
             logger.warning(f"  다중 다운로드 실패: {e}")
             logger.info("  단일 영상 다운로드로 폴백...")
             single_bg = str(output_dir / f"{base_name}_background.mp4")
@@ -217,7 +224,7 @@ def main():
         
         composer = VideoComposer(config)
         output_video_path, video_duration = composer.compose(
-            background_paths=background_paths,  # ★ 리스트 전달
+            background_paths=background_paths,
             narration_path=narration_path,
             subtitle_path=subtitle_path,
             output_path=output_video_path,
@@ -296,6 +303,7 @@ def main():
         logger.info(f"  ⏱ 길이: {video_duration:.1f}초")
         logger.info(f"  🎥 배경: {len(background_paths)}개 영상 사용")
         logger.info(f"  📁 파일: {output_video_path}")
+        logger.info(f"  📝 히스토리: {'저장됨' if save_history else '저장 안함 (테스트)'}")
         if upload_result:
             logger.info(f"  🔗 URL: {upload_result['url']}")
         logger.info("=" * 60)
