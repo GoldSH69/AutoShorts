@@ -147,7 +147,8 @@ gemini:
 # ─── TTS ───
 tts:
   engine: "gtts"
-  speed_factor: 1.05
+  speed_factor: 1.15                    # 🔧 1.05 → 1.15 (gTTS 기본속도 보정)
+  max_speed: 1.50                       # 🆕 최대 배속 상한선 (안전장치)
   silence_between_sentences_ms: 300
   ko:
     lang: "ko"
