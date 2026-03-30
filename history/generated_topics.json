@@ -107,7 +107,13 @@
       "category": "relationship",
       "title": "이 한마디가 관계를 끝낸다고?",
       "hash": "7c59e9b71249"
+    },
+    {
+      "date": "2026-03-30",
+      "category": "quiz",
+      "title": "매일 당신을 속이는 '확증편향'의 비밀",
+      "hash": "c98fa14affbc"
     }
   ],
-  "last_updated": "2026-03-29"
+  "last_updated": "2026-03-30"
 }
