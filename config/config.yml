@@ -37,17 +37,17 @@ video:
 # ─── 요일별 카테고리 (0=월, 6=일) ───
 categories:
   0:
-    id: "quiz"
-    name_ko: "심리학 퀴즈/놀라운 사실"
-    name_en: "Psychology Quiz & Facts"
-    emoji: "💡"
-    hashtags_ko: "#심리학 #심리퀴즈 #뇌과학 #shorts #심리 #심리학퀴즈"
-    hashtags_en: "#psychology #psychologyfacts #quiz #shorts #brain"
+    id: "money"
+    name_ko: "돈의 심리학"
+    name_en: "Psychology of Money"
+    emoji: "💰"
+    hashtags_ko: "#돈의심리학 #소비심리 #행동경제학 #shorts #돈 #심리학"
+    hashtags_en: "#moneypsychology #behavioraleconomics #spending #shorts #finance"
     search_terms:
-      - "brain thinking"
-      - "question mark"
-      - "mind puzzle"
-      - "abstract thought"
+      - "money coins close up"
+      - "shopping mall crowd"
+      - "wallet cash payment"
+      - "stock market graph"
   1:
     id: "success"
     name_ko: "성공한 사람들의 심리 패턴"
