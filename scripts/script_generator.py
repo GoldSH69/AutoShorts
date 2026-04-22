@@ -673,7 +673,7 @@ SNS 캡션 규칙:
     
     # ─── 메인 생성 ───
     
-        def generate(self, category_id=None, weekday=None, language='ko', save_history=True):
+    def generate(self, category_id=None, weekday=None, language='ko', save_history=True):
         """스크립트 생성 (v6.5 - 소재 강제 지정 + 중복 체크)"""
         
         if category_id is None:
