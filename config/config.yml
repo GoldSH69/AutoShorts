@@ -150,7 +150,7 @@ tts:
   speed_factor: 1.0                     # Edge TTS는 자체 속도 좋으므로 1.0
   max_speed: 1.40                       # Edge TTS는 1.40이면 충분
   silence_between_sentences_ms: 300
-  rate: "+5%"                           # 🆕 Edge TTS 기본 말하기 속도 보정
+  rate: "+15%"                           # 🆕 Edge TTS 기본 말하기 속도 보정 (5%->15%로 빠르게 설정)
   voices:
     # 요일별 음성 매핑 (카테고리 id → 음성)
     money: "ko-KR-HyunsuNeural"        # 월: 나레이션 특화, 권위감
