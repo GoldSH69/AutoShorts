@@ -12,10 +12,10 @@ from utils import logger, ensure_dir, get_env
 
 # 카테고리별 기본 키워드 풀 (Gemini 키워드 실패 시 백업)
 CATEGORY_KEYWORDS = {
-    'quiz': [
-        'brain neuron', 'thinking person silhouette', 'abstract light',
-        'psychology concept', 'question mark', 'mind puzzle',
-        'neural network', 'eye close up', 'dark abstract'
+    'money': [
+        'money coins close up', 'credit card payment', 'shopping mall crowd',
+        'wallet cash', 'stock market graph', 'piggy bank saving',
+        'luxury store window', 'receipt bill', 'gold bars wealth'
     ],
     'success': [
         'business success', 'city skyline night', 'mountain top',
