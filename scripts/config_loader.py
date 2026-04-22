@@ -88,17 +88,20 @@ class Config:
     def get_gemini_retry_count(self):
         return self.get('gemini', 'retry_count', default=3)
     
-    # ─── TTS ───
+        # ─── TTS ───
     def get_tts_config(self, language='ko'):
         base = self.get('tts', default={})
         lang_config = self.get('tts', language, default={})
         return {
-            'engine': base.get('engine', 'gtts'),
-            'speed_factor': base.get('speed_factor', 1.05),
-            'max_speed': base.get('max_speed', 1.50),
+            'engine': base.get('engine', 'edge-tts'),
+            'speed_factor': base.get('speed_factor', 1.0),
+            'max_speed': base.get('max_speed', 1.40),
             'silence_ms': base.get('silence_between_sentences_ms', 300),
+            'rate': base.get('rate', '+0%'),
+            'voices': base.get('voices', {}),
             'lang': lang_config.get('lang', language),
-            'tld': lang_config.get('tld', 'com'),
+            'tld': lang_config.get('tld', 'com'),       # gTTS 폴백용 유지
+            'voice': lang_config.get('voice', ''),       # 영어용
         }
     
     # ─── 영상 ───

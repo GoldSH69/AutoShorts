@@ -144,17 +144,28 @@ gemini:
   retry_delay: 10
 
 # ─── TTS ───
+# ─── TTS ───
 tts:
-  engine: "gtts"
-  speed_factor: 1.15                    # 🔧 1.05 → 1.15 (gTTS 기본속도 보정)
-  max_speed: 1.50                       # 🆕 최대 배속 상한선 (안전장치)
+  engine: "edge-tts"
+  speed_factor: 1.0                     # Edge TTS는 자체 속도 좋으므로 1.0
+  max_speed: 1.40                       # Edge TTS는 1.40이면 충분
   silence_between_sentences_ms: 300
+  rate: "+5%"                           # 🆕 Edge TTS 기본 말하기 속도 보정
+  voices:
+    # 요일별 음성 매핑 (카테고리 id → 음성)
+    money: "ko-KR-HyunsuNeural"        # 월: 나레이션 특화, 권위감
+    success: "ko-KR-GookMinNeural"     # 화: 젊고 활력있는 톤
+    brain: "ko-KR-BongJinNeural"       # 수: 앵커톤, 정보 전달력
+    dark: "ko-KR-InJoonNeural"         # 목: 차분하고 어두운 분위기
+    hack: "ko-KR-YuJinNeural"          # 금: 활발, 실천 독려
+    love: "ko-KR-SeoHyeonNeural"       # 토: 자연스럽고 공감
+    relationship: "ko-KR-JiMinNeural"  # 일: 부드러운 상담사 톤
+    default: "ko-KR-HyunsuNeural"      # 폴백
   ko:
     lang: "ko"
-    tld: "co.kr"
   en:
     lang: "en"
-    tld: "com"
+    voice: "en-US-GuyNeural"
 
 # ─── 배경 영상 ───
 background:

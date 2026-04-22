@@ -141,10 +141,10 @@ def main():
         
         # ─── Step 2: TTS 음성 생성 ───
         logger.info("")
-        logger.info("🔊 Step 2: TTS 음성 생성 (gTTS + 자동 배속)")
+        logger.info("🔊 Step 2: TTS 음성 생성 (Edge TTS + 요일별 음성)")
         logger.info("-" * 40)
         
-        tts = TTSGenerator(config)
+        tts = TTSGenerator(config, category_id=category_id)
         
         tts_result = tts.generate(
             text=script_data['full_script'],
