@@ -18,7 +18,7 @@ on:
         type: choice
         options:
           - auto
-          - quiz
+          - money
           - success
           - brain
           - dark
