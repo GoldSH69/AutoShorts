@@ -21,6 +21,105 @@ except ImportError:
 
 
 # ─── 상수 ───
+# ─── 카테고리별 소재 목록 (프롬프트 소재와 동일) ───
+CATEGORY_TOPICS = {
+    'money': [
+        '심적 회계(Mental Accounting)',
+        '매몰비용 오류',
+        '앵커링 효과와 세일 가격',
+        '라떼 팩터와 복리',
+        '카드 vs 현금 결제 심리',
+        '손실회피 (카너먼-트버스키)',
+        '파킨슨의 법칙 수입편',
+        '현재편향과 저축',
+        '사회적 비교와 소비',
+        '무료의 심리학 (댄 애리얼리)',
+        '선택 과부하와 투자',
+        '72의 법칙',
+    ],
+    'success': [
+        '의도적 연습(Deliberate Practice)',
+        '성장 마인드셋 (캐롤 드웩)',
+        '시각화의 뇌과학',
+        '5초 법칙 (멜 로빈스)',
+        '습관 루프 (찰스 두히그)',
+        '파킨슨의 법칙',
+        '지연된 보상 (마시멜로 실험)',
+        '아침 루틴의 뇌과학',
+        '실패 편향',
+        '목표 설정 SMART vs 구현 의도',
+        '환경 설계와 습관',
+    ],
+    'brain': [
+        '도파민 디톡스',
+        '포모도로 25분 전두엽',
+        '아침 햇빛 세로토닌',
+        '운동 20분 BDNF',
+        '멀티태스킹 인지 비용',
+        '90분 울트라디안 리듬',
+        '낮잠 20분 NASA 연구',
+        '냉수 샤워 노르에피네프린',
+        '명상 8주 편도체 (하버드)',
+        '씹는 행위 코르티솔',
+        '2분 규칙 전두엽',
+        '수면 글림프 시스템',
+    ],
+    'dark': [
+        '상호성 원리 (치알디니)',
+        '문간에 발 들이기(Foot-in-the-door)',
+        '사회적 증거',
+        '희소성 원리',
+        '권위 편향 (밀그램)',
+        '가스라이팅 3단계',
+        '미러링 기법',
+        '프레이밍 효과',
+        '닻내리기(Anchoring)',
+        '칵테일 파티 효과',
+        '벤자민 프랭클린 효과',
+    ],
+    'hack': [
+        '구현 의도(Implementation Intention)',
+        '2분 규칙',
+        '습관 스태킹 (제임스 클리어)',
+        '자아 고갈(Ego Depletion)',
+        '환경 설계 선택 설계',
+        '작은 승리(Small Wins) 도파민',
+        '자기 효능감 (반두라)',
+        '세이렌 서버(Ulysses Contract)',
+        '파킨슨의 법칙 데드라인',
+        '시각화의 함정',
+        '자기 자비(Self-Compassion)',
+    ],
+    'love': [
+        '호감 무의식 신호 (미러링)',
+        '밀당 희소성 원리 간헐적 강화',
+        '첫인상 7초 후광효과',
+        '연락 불확실성 집착 심리',
+        '이별 후 손실회피 심리',
+        '썸에서 관계로 결정적 행동',
+        '질투 편도체 활성화',
+        '커플 5:1 비율 (가트만)',
+        '익숙함과 설렘의 심리학',
+        '고백 타이밍 피크엔드 법칙',
+        '눈 맞춤 3초 법칙',
+        '공포 영화 데이트 오귀인 이론',
+        '로미오와 줄리엣 효과',
+    ],
+    'relationship': [
+        '가트만 4기수',
+        '5:1 긍정적 상호작용 비율',
+        '비폭력 대화(NVC)',
+        '애착 이론 불안형 회피형',
+        '경청 옥시토신',
+        '초두효과 대화 3분',
+        '자기 노출 법칙 47%',
+        '감정 코칭 갈등 65% 감소',
+        '심리적 안전감 (구글)',
+        '투사(Projection)',
+        '역설적 변화 이론',
+        '메타 대화',
+    ],
+}
 
 # thinking 모델 판별
 THINKING_MODELS = {
@@ -214,7 +313,50 @@ SNS 캡션 규칙:
         if not recent:
             return "아직 없음"
         return '\n'.join([f"- {t.get('title', '')}" for t in recent])
-    
+
+    def _select_forced_topic(self, category_id):
+        """
+        🆕 v6.5 소재 강제 선택
+        - 이전에 다룬 주제와 겹치지 않는 소재를 랜덤 선택
+        - 모든 소재를 다 사용했으면 가장 오래된 것부터 재사용
+        """
+        import random
+        
+        topics_pool = CATEGORY_TOPICS.get(category_id, [])
+        if not topics_pool:
+            logger.warning(f"  카테고리 '{category_id}'의 소재 목록 없음")
+            return "자유 주제 선택"
+        
+        # 이전 주제 키워드 추출
+        history = self._load_history()
+        previous = history.get('topics', [])
+        same_cat = [t for t in previous if t.get('category') == category_id]
+        recent_titles = [t.get('title', '').lower() for t in same_cat[-30:]]
+        
+        # 사용 안 한 소재 필터링
+        unused = []
+        for topic in topics_pool:
+            topic_keywords = topic.lower().split()
+            # 이전 제목에 핵심 키워드가 포함되어 있는지 체크
+            used = False
+            for title in recent_titles:
+                match_count = sum(1 for kw in topic_keywords if kw in title)
+                if match_count >= 2:  # 키워드 2개 이상 겹치면 사용된 것으로 판단
+                    used = True
+                    break
+            if not used:
+                unused.append(topic)
+        
+        if unused:
+            selected = random.choice(unused)
+            logger.info(f"  🎯 소재 선택: '{selected}' (미사용 {len(unused)}개 중)")
+        else:
+            # 모든 소재 사용됨 → 가장 오래된 것부터 재사용
+            selected = random.choice(topics_pool)
+            logger.info(f"  🔄 소재 재사용: '{selected}' (모든 소재 사용됨, 랜덤 선택)")
+        
+        return selected
+        
     # ─── Gemini API 호출 ───
     
     def _call_gemini(self, prompt, model_name, use_json_mode=True):
@@ -531,8 +673,8 @@ SNS 캡션 규칙:
     
     # ─── 메인 생성 ───
     
-    def generate(self, category_id=None, weekday=None, language='ko', save_history=True):
-        """스크립트 생성"""
+        def generate(self, category_id=None, weekday=None, language='ko', save_history=True):
+        """스크립트 생성 (v6.5 - 소재 강제 지정 + 중복 체크)"""
         
         if category_id is None:
             category_id = self.config.get_category_id(weekday)
@@ -541,7 +683,13 @@ SNS 캡션 규칙:
         
         template = self._load_prompt_template(category_id, language)
         previous_topics = self._get_previous_topics(category_id)
+        
+        # 🆕 v6.5: 소재 강제 선택
+        forced_topic = self._select_forced_topic(category_id)
+        
+        # 프롬프트 변수 치환
         prompt = template.replace('{previous_topics}', previous_topics)
+        prompt = prompt.replace('{forced_topic}', forced_topic)
         
         models = []
         seen = set()
@@ -553,44 +701,61 @@ SNS 캡션 규칙:
         logger.info(f"시도할 모델: {models}")
         
         result = None
+        max_dedup_attempts = 3  # 🆕 중복 시 최대 재시도
         
-        for model_name in models:
-            logger.info(f"\n{'─'*50}")
-            logger.info(f"📡 모델: {model_name}")
-            logger.info(f"{'─'*50}")
+        for dedup_attempt in range(max_dedup_attempts):
+            if dedup_attempt > 0:
+                # 재시도 시 다른 소재 선택
+                forced_topic = self._select_forced_topic(category_id)
+                prompt = template.replace('{previous_topics}', previous_topics)
+                prompt = prompt.replace('{forced_topic}', forced_topic)
+                logger.info(f"  🔄 중복 감지, 소재 변경: '{forced_topic}' (시도 {dedup_attempt+1})")
             
-            for attempt in range(self.retry_count):
-                logger.info(f"[시도 {attempt+1}/{self.retry_count}] JSON 모드")
+            for model_name in models:
+                logger.info(f"\n{'─'*50}")
+                logger.info(f"📡 모델: {model_name}")
+                logger.info(f"{'─'*50}")
                 
-                raw = self._call_gemini(prompt, model_name, use_json_mode=True)
+                for attempt in range(self.retry_count):
+                    logger.info(f"[시도 {attempt+1}/{self.retry_count}] JSON 모드")
+                    
+                    raw = self._call_gemini(prompt, model_name, use_json_mode=True)
+                    
+                    if raw:
+                        parsed = safe_json_loads(raw)
+                        if parsed and self._validate_script(parsed):
+                            result = parsed
+                            break
+                        else:
+                            logger.warning(f"  파싱/검증 실패 (응답 {len(raw)}자)")
+                    
+                    if attempt < self.retry_count - 1:
+                        delay = self.config.get('gemini', 'retry_delay', default=10)
+                        logger.info(f"  {delay}초 대기...")
+                        time.sleep(delay)
+                
+                if result:
+                    break
+                
+                logger.info(f"[텍스트 모드] 재시도")
+                raw = self._call_gemini(prompt, model_name, use_json_mode=False)
                 
                 if raw:
                     parsed = safe_json_loads(raw)
                     if parsed and self._validate_script(parsed):
                         result = parsed
                         break
-                    else:
-                        logger.warning(f"  파싱/검증 실패 (응답 {len(raw)}자)")
                 
-                if attempt < self.retry_count - 1:
-                    delay = self.config.get('gemini', 'retry_delay', default=10)
-                    logger.info(f"  {delay}초 대기...")
-                    time.sleep(delay)
+                logger.warning(f"  모델 {model_name} 실패, 다음 모델로...")
+                time.sleep(3)
             
             if result:
-                break
-            
-            logger.info(f"[텍스트 모드] 재시도")
-            raw = self._call_gemini(prompt, model_name, use_json_mode=False)
-            
-            if raw:
-                parsed = safe_json_loads(raw)
-                if parsed and self._validate_script(parsed):
-                    result = parsed
-                    break
-            
-            logger.warning(f"  모델 {model_name} 실패, 다음 모델로...")
-            time.sleep(3)
+                # 🆕 v6.5: 제목 중복 체크
+                if self._is_duplicate_title(result, category_id):
+                    logger.warning(f"  ⚠️ 제목 중복 감지: '{result.get('title', '')}'")
+                    result = None  # 재생성
+                    continue
+                break  # 중복 아니면 완료
         
         if not result:
             logger.error("❌ 모든 모델에서 실패!")
@@ -598,6 +763,7 @@ SNS 캡션 규칙:
         
         logger.info(f"\n✅ 스크립트 생성 성공!")
         logger.info(f"  제목: {result.get('title', '')}")
+        logger.info(f"  지정 소재: {forced_topic}")
         logger.info(f"  스크립트: {result.get('full_script', '')[:80]}...")
         logger.info(f"  검색 키워드: {result.get('search_keywords', [])}")
         logger.info(f"  인스타 캡션: {'있음' if result.get('instagram_caption') else '기본값'}")
@@ -704,7 +870,34 @@ SNS 캡션 규칙:
                      f"{len(data['search_keywords'])}키워드, "
                      f"IG#{ig_count} TT#{tt_count})")
         return True
-    
+
+    def _is_duplicate_title(self, result, category_id):
+        """
+        🆕 v6.5 제목 중복 체크
+        - 최근 30개 제목과 핵심 키워드 비교
+        - 3개 이상 겹치면 중복으로 판단
+        """
+        new_title = result.get('title', '').lower()
+        new_script = result.get('full_script', '').lower()
+        
+        history = self._load_history()
+        previous = history.get('topics', [])
+        same_cat = [t for t in previous if t.get('category') == category_id]
+        recent_titles = [t.get('title', '').lower() for t in same_cat[-30:]]
+        
+        # 새 제목의 핵심 단어 추출 (2글자 이상)
+        import re
+        new_words = set(w for w in re.findall(r'[가-힣a-z]{2,}', new_title))
+        
+        for old_title in recent_titles:
+            old_words = set(w for w in re.findall(r'[가-힣a-z]{2,}', old_title))
+            overlap = new_words & old_words
+            if len(overlap) >= 3:
+                logger.warning(f"  제목 겹침: {overlap} (기존: '{old_title}')")
+                return True
+        
+        return False
+        
     def _auto_segments(self, text):
         """자막 세그먼트 자동 생성"""
         sentences = re.split(r'(?<=[.?!。])\s*', text)
