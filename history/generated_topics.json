@@ -203,7 +203,13 @@
       "category": "dark",
       "title": "당신 이름 부르면 호감도 UP?",
       "hash": "b0e278699e76"
+    },
+    {
+      "date": "2026-04-24",
+      "category": "hack",
+      "title": "마감일이 없으면 일은 늘어난다? 파킨슨의 법칙!",
+      "hash": "5e5fa02d58a6"
     }
   ],
-  "last_updated": "2026-04-23"
+  "last_updated": "2026-04-24"
 }
