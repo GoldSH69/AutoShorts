@@ -21,6 +21,12 @@ except ImportError:
 
 
 # ─── 상수 ───
+# ─── 블로그 홍보 문구 ───
+BLOG_CTA_NARRATION = "더 많은 심리학 콘텐츠? 프로필 링크를 확인하세요!"
+BLOG_URL = "https://mindground-eosin.vercel.app"
+BLOG_FOOTER_INSTAGRAM = "🧠 더 많은 심리학 콘텐츠 → 프로필 링크 확인!"
+BLOG_FOOTER_TIKTOK = "🧠 더 많은 심리학 콘텐츠 → 프로필 링크!"
+
 # ─── 카테고리별 소재 목록 (프롬프트 소재와 동일) ───
 CATEGORY_TOPICS = {
     'money': [
@@ -664,6 +670,11 @@ SNS 캡션 규칙:
         if not data.get('tiktok_caption'):
             data['tiktok_caption'] = f"{data.get('hook', '🧠 뇌를 깨우는 30초')} 😳🧠"
             logger.info("  틱톡 캡션: 기본값 생성")
+
+        # === [5단계] 블로그 홍보 문구 append ===
+        data['instagram_caption'] = data['instagram_caption'].rstrip() + f"\n\n{BLOG_FOOTER_INSTAGRAM}"
+        data['tiktok_caption'] = data['tiktok_caption'].rstrip() + f"\n{BLOG_FOOTER_TIKTOK}"
+        logger.info("  📎 블로그 홍보 문구 추가 (인스타/틱톡)")
         
         # ★ 최종: 리스트 → 문자열 변환
         data['instagram_hashtags'] = ' '.join(ig_tags)
@@ -860,6 +871,14 @@ SNS 캡션 규칙:
         
         data['search_keyword'] = data['search_keywords'][0]
         
+        # ─── ★ 나레이션 + 자막에 블로그 CTA append ───
+        data['full_script'] = data['full_script'].rstrip() + ' ' + BLOG_CTA_NARRATION
+        data['subtitle_segments'].append({
+            'text': BLOG_CTA_NARRATION,
+            'duration': 3
+        })
+        logger.info(f"  📎 나레이션 CTA 추가: '{BLOG_CTA_NARRATION}'")
+
         # ─── ★ SNS 캡션 + 해시태그 정규화 (v6.3) ───
         data = self._normalize_sns_captions(data)
         

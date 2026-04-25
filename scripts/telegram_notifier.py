@@ -11,6 +11,9 @@ import requests
 from pathlib import Path
 from utils import logger, get_env, get_today_str, get_weekday_name_ko
 
+# ─── 블로그 홍보 문구 ───
+BLOG_FOOTER_TELEGRAM = "\n🧠 Mind Ground — 심리 · 운세 · 생활정보 · AI\n👉 https://mindground-eosin.vercel.app"
+
 class TelegramNotifier:
     """텔레그램 봇 알림 v2 - SNS 캡션 지원"""
     
@@ -74,7 +77,8 @@ class TelegramNotifier:
 ⏱ 길이: {duration_str}
 📤 업로드: {upload_status}
 {link_line}
-{meta_info}"""
+{meta_info}
+{BLOG_FOOTER_TELEGRAM}"""
         
         # ① 메인 상태 메시지 전송
         self._send_message(message)
@@ -105,6 +109,7 @@ class TelegramNotifier:
         # ── 인스타그램 메시지 ──
         if ig_caption:
             ig_message = (
+                f"📸 [인스타그램 캡션]\n\n"
                 f"{ig_caption}\n\n"
                 f"{ig_hashtags}"
             )
@@ -115,6 +120,7 @@ class TelegramNotifier:
         # ── 틱톡 메시지 ──
         if tk_caption:
             tk_message = (
+                f"🎵 [틱톡 캡션]\n\n"
                 f"{tk_caption}\n\n"
                 f"{tk_hashtags}"
             )
