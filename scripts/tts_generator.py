@@ -125,7 +125,7 @@ class TTSGenerator:
             logger.info("gTTS 폴백 시도...")
             return self._generate_gtts_fallback(
                 text, output_path, language, tts_config,
-                target_duration, max_duration, segments
+                target_duration, max_duration
             )
 
     # ─── Edge TTS 코어 ───
@@ -400,7 +400,7 @@ class TTSGenerator:
 
     # ─── gTTS 폴백 ───
 
-    def _generate_gtts_fallback(self, text, output_path, language, tts_config,
+        def _generate_gtts_fallback(self, text, output_path, language, tts_config,
                                  target_duration, max_duration, segments=None):
         """Edge TTS 실패 시 gTTS로 폴백 (timed_segments 포함)"""
         from gtts import gTTS
