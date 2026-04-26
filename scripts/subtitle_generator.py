@@ -15,13 +15,12 @@ class SubtitleGenerator:
         self.sub_config = config.get_subtitle_config()
         logger.info("SubtitleGenerator v2 초기화 (음성 기반 싱크)")
     
-    def generate(self, segments, output_path, language='ko', 
+    def generate(self, output_path, language='ko', 
                  total_duration=30, timed_segments=None):
         """
-        ASS 자막 파일 생성
+        ASS 자막 파일 생성 (TTS 실측 타이밍 기반)
         
         Args:
-            segments: Gemini 원본 [{"text": "...", "duration": 3}, ...]
             output_path: 출력 파일 경로 (.ass)
             language: 언어
             total_duration: 전체 영상 길이
@@ -64,23 +63,19 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
         
         # ── 타이밍 소스 결정 ──
         if timed_segments and len(timed_segments) > 0:
-            # ✅ TTS 실측 타이밍 사용 (완벽한 싱크)
             logger.info(f"자막 타이밍: TTS 실측 기반 ({len(timed_segments)}개)")
             ass_content += self._build_events_from_timed(
                 timed_segments, max_chars, language
             )
         else:
-            # ⚠️ 폴백: Gemini duration 기반 (비례 스케일링)
-            logger.warning("자막 타이밍: Gemini duration 기반 (폴백)")
-            ass_content += self._build_events_from_gemini(
-                segments, total_duration, max_chars, language
-            )
+            logger.error("❌ timed_segments가 없습니다! 자막 생성 불가")
+            raise Exception("TTS timed_segments가 필요합니다")
         
         # 파일 저장
         with open(output_path, 'w', encoding='utf-8-sig') as f:
             f.write(ass_content)
         
-        seg_count = len(timed_segments) if timed_segments else len(segments)
+        seg_count = len(timed_segments)
         logger.info(f"자막 생성 완료: {output_path} ({seg_count}개 세그먼트)")
         return output_path
     
@@ -110,42 +105,6 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
             fade = "{\\fad(150,100)}"
             
             events += f"Dialogue: 0,{start_str},{end_str},{style},,0,0,0,,{fade}{display_text}\n"
-        
-        return events
-    
-    def _build_events_from_gemini(self, segments, total_duration, max_chars, language):
-        """Gemini duration 기반 자막 이벤트 (폴백)"""
-        events = ""
-        current_time = 0.0
-        total_segment_duration = sum(s.get('duration', 3) for s in segments)
-        
-        if total_segment_duration > 0:
-            scale = total_duration / total_segment_duration
-            # 스케일링 범위 제한
-            scale = max(0.5, min(scale, 2.0))
-        else:
-            scale = 1.0
-        
-        for i, segment in enumerate(segments):
-            text = segment.get('text', '')
-            duration = segment.get('duration', 3) * scale
-            
-            if not text:
-                continue
-            
-            lines = split_text_for_subtitle(text, language, max_chars)
-            display_text = '\\N'.join(lines)
-            
-            style = "Highlight" if i == 0 else "Default"
-            
-            start = self._format_time(current_time)
-            end = self._format_time(current_time + duration)
-            
-            fade = "{\\fad(200,150)}"
-            
-            events += f"Dialogue: 0,{start},{end},{style},,0,0,0,,{fade}{display_text}\n"
-            
-            current_time += duration
         
         return events
     

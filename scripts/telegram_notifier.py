@@ -109,7 +109,6 @@ class TelegramNotifier:
         # ── 인스타그램 메시지 ──
         if ig_caption:
             ig_message = (
-                f"📸 [인스타그램 캡션]\n\n"
                 f"{ig_caption}\n\n"
                 f"{ig_hashtags}"
             )
@@ -120,7 +119,6 @@ class TelegramNotifier:
         # ── 틱톡 메시지 ──
         if tk_caption:
             tk_message = (
-                f"🎵 [틱톡 캡션]\n\n"
                 f"{tk_caption}\n\n"
                 f"{tk_hashtags}"
             )

@@ -130,7 +130,6 @@ def main():
         
         logger.info(f"  제목: {script_data.get('title', '')}")
         logger.info(f"  스크립트: {script_data.get('full_script', '')[:80]}...")
-        logger.info(f"  자막 세그먼트: {len(script_data.get('subtitle_segments', []))}개")
         
         # 키워드 확인
         search_keywords = script_data.get('search_keywords', [])
@@ -150,7 +149,6 @@ def main():
             text=script_data['full_script'],
             output_path=narration_path,
             language=language,
-            segments=script_data.get('subtitle_segments'),
         )
         
         narration_path = tts_result[0]
@@ -196,7 +194,6 @@ def main():
         
         sub_gen = SubtitleGenerator(config)
         subtitle_path = sub_gen.generate(
-            segments=script_data['subtitle_segments'],
             output_path=subtitle_path,
             language=language,
             total_duration=narration_duration,

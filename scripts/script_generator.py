@@ -26,6 +26,9 @@ BLOG_CTA_NARRATION = "더 많은 심리학 콘텐츠? 프로필 링크를 확인
 BLOG_URL = "https://mindground-eosin.vercel.app"
 BLOG_FOOTER_INSTAGRAM = "🧠 더 많은 심리학 콘텐츠 → 프로필 링크 확인!"
 BLOG_FOOTER_TIKTOK = "🧠 더 많은 심리학 콘텐츠 → 프로필 링크!"
+# ─── 스크립트 글자수 기준 ───
+SCRIPT_MIN_CHARS = 260
+SCRIPT_MAX_CHARS = 360
 
 # ─── 카테고리별 소재 목록 (프롬프트 소재와 동일) ───
 CATEGORY_TOPICS = {
@@ -265,13 +268,6 @@ SNS 캡션 규칙:
   "full_script": "전체 나레이션 (hook+body+cta를 자연스럽게 연결)",
   "description": "유튜브 설명 50자 이내",
   "search_keywords": ["영어키워드1", "영어키워드2", "영어키워드3"],
-  "subtitle_segments": [
-    {{"text": "자막1", "duration": 3}},
-    {{"text": "자막2", "duration": 4}},
-    {{"text": "자막3", "duration": 5}},
-    {{"text": "자막4", "duration": 4}},
-    {{"text": "자막5", "duration": 3}}
-  ],
   "instagram_caption": "인스타그램 본문 3~5줄 (해시태그 넣지 말 것)",
   "instagram_hashtags": ["#주제태그1", "#주제태그2", "#주제태그3", "#영어태그1", "#영어태그2"],
   "tiktok_caption": "틱톡 후킹 1~2줄 (해시태그 넣지 말 것)",
@@ -701,6 +697,8 @@ SNS 캡션 규칙:
         # 프롬프트 변수 치환
         prompt = template.replace('{previous_topics}', previous_topics)
         prompt = prompt.replace('{forced_topic}', forced_topic)
+        prompt = prompt.replace('{min_chars}', str(SCRIPT_MIN_CHARS))
+        prompt = prompt.replace('{max_chars}', str(SCRIPT_MAX_CHARS))
         
         models = []
         seen = set()
@@ -816,24 +814,7 @@ SNS 캡션 규칙:
             else:
                 logger.warning(f"검증 실패: 스크립트 부족")
                 return False
-        
-        # 자막 자동 생성
-        segments = data.get('subtitle_segments', [])
-        if not segments or not isinstance(segments, list) or len(segments) < 1:
-            data['subtitle_segments'] = self._auto_segments(script)
-        else:
-            valid_segments = []
-            for seg in segments:
-                if isinstance(seg, dict) and seg.get('text'):
-                    if 'duration' not in seg:
-                        seg['duration'] = 3
-                    valid_segments.append(seg)
-            
-            if valid_segments:
-                data['subtitle_segments'] = valid_segments
-            else:
-                data['subtitle_segments'] = self._auto_segments(script)
-        
+                
         # 기본값 채우기
         if not data.get('hook'):
             data['hook'] = script[:50]
@@ -873,11 +854,6 @@ SNS 캡션 규칙:
         
         # ─── ★ 나레이션 + 자막에 블로그 CTA append ───
         data['full_script'] = data['full_script'].rstrip() + ' ' + BLOG_CTA_NARRATION
-        data['subtitle_segments'].append({
-            'text': BLOG_CTA_NARRATION,
-            'duration': 3
-        })
-        logger.info(f"  📎 나레이션 CTA 추가: '{BLOG_CTA_NARRATION}'")
 
         # ─── ★ SNS 캡션 + 해시태그 정규화 (v6.3) ───
         data = self._normalize_sns_captions(data)
@@ -885,9 +861,8 @@ SNS 캡션 규칙:
         ig_count = len(data['instagram_hashtags'].split()) if isinstance(data['instagram_hashtags'], str) else len(data['instagram_hashtags'])
         tt_count = len(data['tiktok_hashtags'].split()) if isinstance(data['tiktok_hashtags'], str) else len(data['tiktok_hashtags'])
         logger.info(f"검증 ✅: '{title}' ({len(data['full_script'])}자, "
-                     f"{len(data['subtitle_segments'])}세그먼트, "
-                     f"{len(data['search_keywords'])}키워드, "
-                     f"IG#{ig_count} TT#{tt_count})")
+                f"{len(data['search_keywords'])}키워드, "
+                f"IG#{ig_count} TT#{tt_count})")
         return True
 
     def _is_duplicate_title(self, result, category_id):
@@ -915,19 +890,5 @@ SNS 캡션 규칙:
                 logger.warning(f"  제목 겹침: {overlap} (기존: '{old_title}')")
                 return True
         
-        return False
-        
-    def _auto_segments(self, text):
-        """자막 세그먼트 자동 생성"""
-        sentences = re.split(r'(?<=[.?!。])\s*', text)
-        sentences = [s.strip() for s in sentences if s.strip()]
-        
-        if not sentences:
-            return [{"text": text, "duration": 5}]
-        
-        segments = []
-        for s in sentences:
-            duration = max(2, min(len(s) / 4.5, 8))
-            segments.append({"text": s, "duration": round(duration, 1)})
-        
-        return segments
+        return False       
+    
