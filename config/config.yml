@@ -157,15 +157,14 @@ tts:
   silence_between_sentences_ms: 300
   rate: "+20%"                           # 🆕 Edge TTS 기본 말하기 속도 보정 (5%->15%로 빠르게 설정)
   voices:
-    # 요일별 음성 매핑 (카테고리 id → 음성)
-    money: "ko-KR-HyunsuNeural"        # 월: 나레이션 특화, 권위감
-    success: "ko-KR-GookMinNeural"     # 화: 젊고 활력있는 톤
-    brain: "ko-KR-BongJinNeural"       # 수: 앵커톤, 정보 전달력
-    dark: "ko-KR-InJoonNeural"         # 목: 차분하고 어두운 분위기
-    hack: "ko-KR-YuJinNeural"          # 금: 활발, 실천 독려
-    love: "ko-KR-SeoHyeonNeural"       # 토: 자연스럽고 공감
-    relationship: "ko-KR-JiMinNeural"  # 일: 부드러운 상담사 톤
-    default: "ko-KR-HyunsuNeural"      # 폴백
+      money: 'ko-KR-InJoonNeural'
+      success: 'ko-KR-InJoonNeural'
+      brain: 'ko-KR-SunHiNeural'
+      dark: 'ko-KR-InJoonNeural'
+      hack: 'ko-KR-SunHiNeural'
+      love: 'ko-KR-SunHiNeural'
+      relationship: 'ko-KR-SunHiNeural'
+      default: 'ko-KR-InJoonNeural'
   ko:
     lang: "ko"
   en:
