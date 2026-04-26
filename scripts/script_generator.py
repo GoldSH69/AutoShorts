@@ -814,7 +814,7 @@ SNS 캡션 규칙:
             else:
                 logger.warning(f"검증 실패: 스크립트 부족")
                 return False
-                
+        
         # 기본값 채우기
         if not data.get('hook'):
             data['hook'] = script[:50]
