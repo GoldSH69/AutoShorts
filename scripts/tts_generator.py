@@ -299,14 +299,14 @@ class TTSGenerator:
 
     def _generate_simple(self, text, output_path, language, tts_config,
                           target_duration, max_duration):
-        """세그먼트 없이 전체 텍스트 기반 생성"""
+        """전체 텍스트 → 문장 분리 → 세그먼트별 TTS + 타이밍 측정"""
         sentences = self._split_sentences(text, language)
         logger.info(f"문장 분할: {len(sentences)}개")
 
         base_rate = tts_config.get('rate', '+0%')
 
         with tempfile.TemporaryDirectory() as tmp_dir:
-            audio_files = []
+            segment_audios = []
 
             for i, sentence in enumerate(sentences):
                 sentence = sentence.strip()
@@ -315,34 +315,88 @@ class TTSGenerator:
 
                 tmp_file = os.path.join(tmp_dir, f"sentence_{i:03d}.mp3")
                 self._edge_tts_to_file(sentence, tmp_file, rate=base_rate)
-                audio_files.append(tmp_file)
 
-            if not audio_files:
+                audio = AudioSegment.from_file(tmp_file, format='mp3')
+                segment_audios.append((audio, sentence))
+
+            if not segment_audios:
                 raise Exception("생성된 오디오 파일이 없습니다")
 
-            combined = self._combine_audio_files(
-                audio_files,
-                silence_ms=tts_config.get('silence_ms', 250)
-            )
+            silence_ms = tts_config.get('silence_ms', 250)
 
-            # 스마트 배속 계산
-            raw_duration = len(combined) / 1000.0
+            # 원본 길이 측정
+            combined_raw = AudioSegment.empty()
+            for i, (audio, text) in enumerate(segment_audios):
+                combined_raw += audio
+                if i < len(segment_audios) - 1:
+                    combined_raw += AudioSegment.silent(duration=silence_ms)
+
+            raw_duration = len(combined_raw) / 1000.0
             narration_target = target_duration - 2.0
             rate_str, speed_factor = self._calculate_edge_rate(
                 raw_duration, narration_target, tts_config
             )
 
-            # Edge TTS는 이미 rate 적용됨 → pydub 추가 배속은 최후 수단
-            if raw_duration > max_duration - 2:
-                extra = min(raw_duration / (max_duration - 3), 1.2)
-                combined = self._change_speed(combined, extra)
+            # 배속 필요 시 재생성
+            need_regen = abs(speed_factor - self._parse_rate(base_rate)) > 0.03
 
-            combined.export(output_path, format='mp3', bitrate='192k')
+            if need_regen:
+                logger.info(f"  🔄 배속 변경으로 재생성 (rate={rate_str})")
+                segment_audios = []
+                for i, sentence in enumerate(sentences):
+                    sentence = sentence.strip()
+                    if not sentence:
+                        continue
+                    tmp_file = os.path.join(tmp_dir, f"sentence_re_{i:03d}.mp3")
+                    self._edge_tts_to_file(sentence, tmp_file, rate=rate_str)
+                    audio = AudioSegment.from_file(tmp_file, format='mp3')
+                    segment_audios.append((audio, sentence))
 
-            duration = len(combined) / 1000.0
-            logger.info(f"✅ TTS 생성 완료: {output_path} ({duration:.1f}초)")
+            # 타이밍 측정 + 합치기
+            timed_segments = []
+            combined_final = AudioSegment.empty()
+            current_time = 0.0
 
-            return output_path, duration, None
+            for i, (audio, text) in enumerate(segment_audios):
+                seg_duration = len(audio) / 1000.0
+
+                timed_segments.append({
+                    'text': text,
+                    'start': round(current_time, 2),
+                    'end': round(current_time + seg_duration, 2),
+                    'duration': round(seg_duration, 2),
+                })
+
+                combined_final += audio
+                current_time += seg_duration
+
+                if i < len(segment_audios) - 1:
+                    adj_silence_ms = max(int(silence_ms / max(speed_factor, 1.0)), 100)
+                    combined_final += AudioSegment.silent(duration=adj_silence_ms)
+                    current_time += adj_silence_ms / 1000.0
+
+            # 최종 길이 확인
+            final_duration = len(combined_final) / 1000.0
+
+            if final_duration > max_duration - 2:
+                extra_speed = min(final_duration / (max_duration - 3), 1.2)
+                logger.warning(f"  ⚠️ 여전히 김 ({final_duration:.1f}초), pydub 추가 배속 {extra_speed:.2f}x")
+                combined_final = self._change_speed(combined_final, extra_speed)
+
+                for seg in timed_segments:
+                    seg['start'] = round(seg['start'] / extra_speed, 2)
+                    seg['end'] = round(seg['end'] / extra_speed, 2)
+                    seg['duration'] = round(seg['duration'] / extra_speed, 2)
+
+                final_duration = len(combined_final) / 1000.0
+
+            combined_final.export(output_path, format='mp3', bitrate='192k')
+
+            logger.info(f"✅ TTS 생성 완료: {final_duration:.1f}초, {len(timed_segments)}개 세그먼트")
+            for i, ts in enumerate(timed_segments):
+                logger.info(f"  [{ts['start']:.1f}s ~ {ts['end']:.1f}s] {ts['text'][:25]}...")
+
+            return output_path, final_duration, timed_segments
 
     # ─── gTTS 폴백 ───
 
