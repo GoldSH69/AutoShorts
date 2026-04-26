@@ -402,7 +402,7 @@ class TTSGenerator:
 
     def _generate_gtts_fallback(self, text, output_path, language, tts_config,
                                  target_duration, max_duration, segments=None):
-        """Edge TTS 실패 시 gTTS로 폴백"""
+        """Edge TTS 실패 시 gTTS로 폴백 (timed_segments 포함)"""
         from gtts import gTTS
 
         logger.warning("⚠️ gTTS 폴백 모드 (품질 저하)")
@@ -410,7 +410,7 @@ class TTSGenerator:
         sentences = self._split_sentences(text, language)
 
         with tempfile.TemporaryDirectory() as tmp_dir:
-            audio_files = []
+            segment_audios = []
 
             for i, sentence in enumerate(sentences):
                 sentence = sentence.strip()
@@ -425,32 +425,66 @@ class TTSGenerator:
                     slow=False
                 )
                 tts.save(tmp_file)
-                audio_files.append(tmp_file)
 
-            if not audio_files:
+                audio = AudioSegment.from_file(tmp_file, format='mp3')
+                segment_audios.append((audio, sentence))
+
+            if not segment_audios:
                 raise Exception("gTTS 폴백도 실패")
 
-            combined = self._combine_audio_files(
-                audio_files,
-                silence_ms=tts_config.get('silence_ms', 250)
-            )
+            silence_ms = tts_config.get('silence_ms', 250)
 
-            # gTTS는 느리므로 기존 배속 로직 적용
-            raw_duration = len(combined) / 1000.0
+            # 원본 길이 측정
+            combined_raw = AudioSegment.empty()
+            for i, (audio, text) in enumerate(segment_audios):
+                combined_raw += audio
+                if i < len(segment_audios) - 1:
+                    combined_raw += AudioSegment.silent(duration=silence_ms)
+
+            raw_duration = len(combined_raw) / 1000.0
             narration_target = target_duration - 2.0
             speed_factor = self._calculate_smart_speed_legacy(
                 raw_duration, narration_target, tts_config
             )
 
+            # 배속 적용
             if speed_factor != 1.0:
-                combined = self._change_speed(combined, speed_factor)
+                new_audios = []
+                for audio, sentence in segment_audios:
+                    new_audios.append((self._change_speed(audio, speed_factor), sentence))
+                segment_audios = new_audios
 
-            combined.export(output_path, format='mp3', bitrate='128k')
+            # 타이밍 측정 + 합치기
+            timed_segments = []
+            combined_final = AudioSegment.empty()
+            current_time = 0.0
 
-            duration = len(combined) / 1000.0
-            logger.info(f"✅ gTTS 폴백 완료: {output_path} ({duration:.1f}초)")
+            for i, (audio, text) in enumerate(segment_audios):
+                seg_duration = len(audio) / 1000.0
 
-            return output_path, duration, None
+                timed_segments.append({
+                    'text': text,
+                    'start': round(current_time, 2),
+                    'end': round(current_time + seg_duration, 2),
+                    'duration': round(seg_duration, 2),
+                })
+
+                combined_final += audio
+                current_time += seg_duration
+
+                if i < len(segment_audios) - 1:
+                    adj_silence_ms = max(int(silence_ms / max(speed_factor, 1.0)), 100)
+                    combined_final += AudioSegment.silent(duration=adj_silence_ms)
+                    current_time += adj_silence_ms / 1000.0
+
+            combined_final.export(output_path, format='mp3', bitrate='128k')
+
+            final_duration = len(combined_final) / 1000.0
+            logger.info(f"✅ gTTS 폴백 완료: {final_duration:.1f}초, {len(timed_segments)}개 세그먼트")
+            for i, ts in enumerate(timed_segments):
+                logger.info(f"  [{ts['start']:.1f}s ~ {ts['end']:.1f}s] {ts['text'][:25]}...")
+
+            return output_path, final_duration, timed_segments
 
     def _calculate_smart_speed_legacy(self, raw_duration, narration_target, tts_config):
         """v3.1 레거시 스마트 배속 (gTTS 폴백용)"""
