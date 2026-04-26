@@ -477,9 +477,25 @@ class TTSGenerator:
                     combined_final += AudioSegment.silent(duration=adj_silence_ms)
                     current_time += adj_silence_ms / 1000.0
 
+            # 최종 길이 확인 (안전장치)
+            final_duration = len(combined_final) / 1000.0
+
+            if final_duration > max_duration - 2:
+                extra_speed = min(final_duration / (max_duration - 3), 1.2)
+                logger.warning(f"  ⚠️ gTTS 여전히 김 ({final_duration:.1f}초), pydub 추가 배속 {extra_speed:.2f}x")
+                combined_final = self._change_speed(combined_final, extra_speed)
+
+                for seg in timed_segments:
+                    seg['start'] = round(seg['start'] / extra_speed, 2)
+                    seg['end'] = round(seg['end'] / extra_speed, 2)
+                    seg['duration'] = round(seg['duration'] / extra_speed, 2)
+
+                final_duration = len(combined_final) / 1000.0
+
             combined_final.export(output_path, format='mp3', bitrate='128k')
 
             final_duration = len(combined_final) / 1000.0
+
             logger.info(f"✅ gTTS 폴백 완료: {final_duration:.1f}초, {len(timed_segments)}개 세그먼트")
             for i, ts in enumerate(timed_segments):
                 logger.info(f"  [{ts['start']:.1f}s ~ {ts['end']:.1f}s] {ts['text'][:25]}...")
