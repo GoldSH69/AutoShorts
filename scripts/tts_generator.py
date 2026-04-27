@@ -3,6 +3,10 @@
 Edge TTS 기반 음성 생성 - v4.0
 (요일별 음성 매핑 + 스마트 배속 + gTTS 폴백)
 """
+"""
+Edge TTS 기반 음성 생성 - v4.2
+(요일별 음성 매핑 + 스마트 배속 + 텍스트 정제 + per-sentence 재시도 + gTTS 폴백)
+"""
 
 import asyncio
 import io
@@ -17,15 +21,15 @@ from utils import logger, ensure_dir
 
 # ─── 요일별 음성 매핑 (config 로드 실패 시 폴백) ───
 DEFAULT_VOICES = {
-    'money': 'ko-KR-HyunsuNeural',
-    'success': 'ko-KR-GookMinNeural',
-    'brain': 'ko-KR-BongJinNeural',
+    'money': 'ko-KR-InJoonNeural',
+    'success': 'ko-KR-InJoonNeural',
+    'brain': 'ko-KR-SunHiNeural',
     'dark': 'ko-KR-InJoonNeural',
-    'hack': 'ko-KR-YuJinNeural',
-    'love': 'ko-KR-SeoHyeonNeural',
-    'relationship': 'ko-KR-JiMinNeural',
+    'hack': 'ko-KR-SunHiNeural',
+    'love': 'ko-KR-SunHiNeural',
+    'relationship': 'ko-KR-SunHiNeural',
 }
-DEFAULT_VOICE = 'ko-KR-HyunsuNeural'
+DEFAULT_VOICE = 'ko-KR-InJoonNeural'
 
 # ─── pydub ffmpeg 경로 설정 ───
 def _setup_ffmpeg_path():
@@ -70,7 +74,7 @@ class TTSGenerator:
         self.video_config = config.get_video_config()
         self.category_id = category_id
         self._voice = self._resolve_voice(category_id)
-        logger.info(f"TTSGenerator v4.0 초기화 (engine: edge-tts, voice: {self._voice})")
+        logger.info(f"TTSGenerator v4.2 초기화 (engine: edge-tts, voice: {self._voice})")
 
     def _resolve_voice(self, category_id):
         """카테고리 ID로 음성 결정"""
@@ -313,11 +317,31 @@ class TTSGenerator:
                 if not sentence:
                     continue
 
-                tmp_file = os.path.join(tmp_dir, f"sentence_{i:03d}.mp3")
-                self._edge_tts_to_file(sentence, tmp_file, rate=base_rate)
+                # TTS용 텍스트 정제 (이모지/특수문자 제거)
+                tts_text = self._clean_tts_text(sentence)
+                if not tts_text or len(tts_text) < 2:
+                    logger.warning(f"  문장 {i+1} 건너뜀 (정제 후 빈 텍스트): {sentence[:30]}")
+                    continue
 
-                audio = AudioSegment.from_file(tmp_file, format='mp3')
-                segment_audios.append((audio, sentence))
+                tmp_file = os.path.join(tmp_dir, f"sentence_{i:03d}.mp3")
+
+                # per-sentence 재시도 (max 2회)
+                success = False
+                for attempt in range(2):
+                    try:
+                        self._edge_tts_to_file(tts_text, tmp_file, rate=base_rate)
+                        audio = AudioSegment.from_file(tmp_file, format='mp3')
+                        segment_audios.append((audio, sentence))  # 원문 텍스트 보존
+                        success = True
+                        break
+                    except Exception as e:
+                        logger.warning(f"  문장 {i+1} Edge TTS 실패 (시도 {attempt+1}/2): {e}")
+                        if attempt == 0:
+                            import time
+                            time.sleep(1)
+
+                if not success:
+                    logger.warning(f"  문장 {i+1} 최종 실패, 건너뜀: {sentence[:30]}")
 
             if not segment_audios:
                 raise Exception("생성된 오디오 파일이 없습니다")
@@ -347,10 +371,18 @@ class TTSGenerator:
                     sentence = sentence.strip()
                     if not sentence:
                         continue
+
+                    tts_text = self._clean_tts_text(sentence)
+                    if not tts_text or len(tts_text) < 2:
+                        continue
+
                     tmp_file = os.path.join(tmp_dir, f"sentence_re_{i:03d}.mp3")
-                    self._edge_tts_to_file(sentence, tmp_file, rate=rate_str)
-                    audio = AudioSegment.from_file(tmp_file, format='mp3')
-                    segment_audios.append((audio, sentence))
+                    try:
+                        self._edge_tts_to_file(tts_text, tmp_file, rate=rate_str)
+                        audio = AudioSegment.from_file(tmp_file, format='mp3')
+                        segment_audios.append((audio, sentence))
+                    except Exception as e:
+                        logger.warning(f"  재생성 문장 {i+1} 실패, 건너뜀: {e}")
 
             # 타이밍 측정 + 합치기
             timed_segments = []
@@ -417,17 +449,26 @@ class TTSGenerator:
                 if not sentence:
                     continue
 
-                tmp_file = os.path.join(tmp_dir, f"fb_{i:03d}.mp3")
-                tts = gTTS(
-                    text=sentence,
-                    lang=tts_config['lang'],
-                    tld=tts_config.get('tld', 'com'),
-                    slow=False
-                )
-                tts.save(tmp_file)
+                # TTS용 텍스트 정제
+                tts_text = self._clean_tts_text(sentence)
+                if not tts_text or len(tts_text) < 2:
+                    logger.warning(f"  gTTS 문장 {i+1} 건너뜀 (정제 후 빈 텍스트): {sentence[:30]}")
+                    continue
 
-                audio = AudioSegment.from_file(tmp_file, format='mp3')
-                segment_audios.append((audio, sentence))
+                tmp_file = os.path.join(tmp_dir, f"fb_{i:03d}.mp3")
+                try:
+                    tts = gTTS(
+                        text=tts_text,
+                        lang=tts_config['lang'],
+                        tld=tts_config.get('tld', 'com'),
+                        slow=False
+                    )
+                    tts.save(tmp_file)
+
+                    audio = AudioSegment.from_file(tmp_file, format='mp3')
+                    segment_audios.append((audio, sentence))  # 원문 보존
+                except Exception as e:
+                    logger.warning(f"  gTTS 문장 {i+1} 실패, 건너뜀: {e}")
 
             if not segment_audios:
                 raise Exception("gTTS 폴백도 실패")
@@ -555,6 +596,31 @@ class TTSGenerator:
             result = [s.strip() for s in sentences if s.strip()]
 
         return result if result else [text]
+
+    def _clean_tts_text(self, text):
+        """TTS용 텍스트 정제 - 이모지/특수문자 제거, 읽을 수 있는 텍스트만 남김"""
+        import unicodedata
+        cleaned = []
+        for c in text:
+            cat = unicodedata.category(c)
+            cp = ord(c)
+            # 이모지 범위 제거
+            if 0x1F300 <= cp <= 0x1FAFF:
+                continue
+            if 0x2600 <= cp <= 0x27BF:
+                continue
+            if 0xFE00 <= cp <= 0xFE0F:
+                continue
+            if cp == 0x200D:
+                continue
+            # Symbol 카테고리 제거 (So=기타심볼, Sk=수식심볼)
+            if cat in ('So', 'Sk'):
+                continue
+            cleaned.append(c)
+        result = ''.join(cleaned).strip()
+        # 연속 공백 정리
+        result = re.sub(r'\s+', ' ', result)
+        return result
 
     def _change_speed(self, audio, speed=1.0):
         """오디오 속도 변경 (pydub, 최후 수단)"""
