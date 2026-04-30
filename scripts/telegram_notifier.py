@@ -12,7 +12,7 @@ from pathlib import Path
 from utils import logger, get_env, get_today_str, get_weekday_name_ko
 
 # ─── 블로그 홍보 문구 ───
-BLOG_FOOTER_TELEGRAM = "\n🧠 Mind Ground — 심리 · 운세 · 생활정보 · AI\n👉 https://mindground-eosin.vercel.app"
+BLOG_FOOTER_TELEGRAM = "\n🧠 Insight Retreat — 심리 · 운세 · 생활정보 · AI\n👉 https://mindground-eosin.vercel.app"
 
 class TelegramNotifier:
     """텔레그램 봇 알림 v2 - SNS 캡션 지원"""
