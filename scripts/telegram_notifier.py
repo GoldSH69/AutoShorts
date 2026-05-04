@@ -35,7 +35,7 @@ class TelegramNotifier:
     
     def send_success(self, video_path=None, script_data=None, 
                      upload_result=None, video_duration=None,
-                     language='ko', weekday=None):
+                     language='ko', weekday=None, bgm_enabled=True):
         """성공 알림 전송"""
         if not self.enabled:
             return False
@@ -57,6 +57,7 @@ class TelegramNotifier:
             link_line = "📱 아래 영상 파일을 YouTube에 업로드하세요"
         
         duration_str = f"{video_duration:.1f}초" if video_duration else "확인 불가"
+        bgm_str = "🎵 ON" if bgm_enabled else "🔇 OFF (틱톡 호환)"
         
         # 업로드 메타데이터 (수동 업로드용)
         meta_info = ""
@@ -75,6 +76,7 @@ class TelegramNotifier:
 📂 카테고리: {emoji} {category_name}
 📝 제목: {title}
 ⏱ 길이: {duration_str}
+🎵 BGM: {bgm_str}
 📤 업로드: {upload_status}
 {link_line}
 {meta_info}

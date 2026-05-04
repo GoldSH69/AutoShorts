@@ -206,14 +206,21 @@ def main():
         logger.info("-" * 40)
         
         bgm_config = config.get_bgm_config()
-        bgm_dir_path = str(get_project_root() / bgm_config.get('directory', 'assets/music'))
-        bgm_path = select_bgm(category_id, bgm_dir_path)
+        bgm_enabled = bgm_config.get('enabled', True)
         
-        if bgm_path:
-            logger.info(f"  BGM: {Path(bgm_path).name}")
+        if bgm_enabled:
+            bgm_dir_path = str(get_project_root() / bgm_config.get('directory', 'assets/music'))
+            bgm_path = select_bgm(category_id, bgm_dir_path)
+            
+            if bgm_path:
+                logger.info(f"  BGM: {Path(bgm_path).name}")
+            else:
+                logger.info("  BGM: 파일 없음 (나레이션만 사용)")
         else:
-            logger.info("  BGM: 없음 (나레이션만 사용)")
-        
+            bgm_path = None
+            logger.info("  🔇 BGM 비활성화 (config: bgm.enabled=false)")
+            logger.info("  → 틱톡 라이트 호환 모드 (무음 BGM)")
+
         # ─── Step 6: 영상 합성 (다중 배경) ───
         logger.info("")
         logger.info("🎬 Step 6: 영상 합성 (다중 배경 전환)")
@@ -290,6 +297,7 @@ def main():
                 video_duration=video_duration,
                 language=language,
                 weekday=weekday,
+                bgm_enabled=bgm_enabled,
             )
         
         # ─── 완료 ───
