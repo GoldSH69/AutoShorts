@@ -229,6 +229,6 @@ history:
 
 # ─── 스케줄 ───
 schedule:
-  ko_cron: "0 6 * * *"
+  ko_cron: "0 5 * * *"
   en_cron: "0 14 * * *"
   timezone: "Asia/Seoul"
