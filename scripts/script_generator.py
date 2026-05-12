@@ -22,7 +22,7 @@ except ImportError:
 
 # ─── 상수 ───
 # ─── 블로그 홍보 문구 ───
-BLOG_CTA_NARRATION = "더 많은 심리학 콘텐츠? 프로필 링크를 확인하세요!"
+BLOG_CTA_NARRATION = "당신의 경험을 댓글로 공유!"
 BLOG_URL = "https://mindground.org"
 BLOG_FOOTER_INSTAGRAM = "🧠 더 많은 심리학 콘텐츠 → 프로필 링크 확인!"
 BLOG_FOOTER_TIKTOK = "🧠 더 많은 심리학 콘텐츠 → 프로필 링크!"
