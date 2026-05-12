@@ -413,7 +413,7 @@ SNS 캡션 규칙:
             used = False
             for title in recent_titles:
                 match_count = sum(1 for kw in topic_keywords if kw in title)
-                if match_count >= 2:  # 키워드 2개 이상 겹치면 사용된 것으로 판단
+                if match_count >= 1:  # 키워드 1개(<-2개 변경 26.05.12) 이상 겹치면 사용된 것으로 판단
                     used = True
                     break
             if not used:
