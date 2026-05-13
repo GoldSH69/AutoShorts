@@ -2,7 +2,7 @@ name: 🇰🇷 Daily Korean Short
 
 on:
   schedule:
-    - cron: '0 5 * * *'
+    - cron: '5 4 * * *' # 한국 시간 오후 1시 5분 (KST)
     
   workflow_dispatch:
     inputs:
