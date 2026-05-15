@@ -329,7 +329,13 @@
       "category": "dark",
       "title": "당신도 모르게 결정한다? 드리프트 결정론",
       "hash": "305bf2afa542"
+    },
+    {
+      "date": "2026-05-15",
+      "category": "hack",
+      "title": "의지력 없이 환경을 바꾸는 심리 해킹",
+      "hash": "50cb74a30276"
     }
   ],
-  "last_updated": "2026-05-14"
+  "last_updated": "2026-05-15"
 }
