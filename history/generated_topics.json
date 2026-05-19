@@ -353,7 +353,13 @@
       "category": "money",
       "title": "세일 마감 10분 전, 왜 지갑이 열릴까?",
       "hash": "fe996d2dd9e7"
+    },
+    {
+      "date": "2026-05-19",
+      "category": "success",
+      "title": "마시멜로 실험, 성공의 비밀?",
+      "hash": "9ab5857edb8b"
     }
   ],
-  "last_updated": "2026-05-18"
+  "last_updated": "2026-05-19"
 }
