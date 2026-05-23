@@ -186,7 +186,7 @@ background:
 
 # ─── BGM ───
 bgm:
-  enabled: false
+  enabled: true
   volume: 0.08
   fade_in_ms: 1000
   fade_out_ms: 2000
