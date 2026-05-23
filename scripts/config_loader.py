@@ -52,7 +52,7 @@ class Config:
     
     def get_category_id(self, weekday=None):
         cat = self.get_today_category(weekday)
-        return cat.get('id', 'quiz')
+        return cat.get('id', 'hack')
     
     def get_category_name(self, weekday=None, language='ko'):
         cat = self.get_today_category(weekday)
