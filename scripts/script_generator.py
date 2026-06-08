@@ -614,6 +614,27 @@ SNS 캡션 규칙:
         prompt = prompt.replace('{min_chars}', str(SCRIPT_MIN_CHARS))
         prompt = prompt.replace('{max_chars}', str(SCRIPT_MAX_CHARS))
         
+        # 댓글 공유 요청 문구를 주제에 맞게 동적으로 생성하기 위한 지침 주입
+        comment_instruction = (
+            "\n\n## 추가 필수 규칙:\n"
+            "6. 이번 주제와 내용에 자연스럽게 부합하며, 시청자의 댓글 참여(경험 공유)를 자연스럽게 유도하는 '댓글 공유 요청 문장'을 반드시 1문장 생성하세요.\n"
+            "   - 예: '여러분도 돈을 모으기 위해 충동구매를 참아보셨나요? 댓글로 경험을 공유해주세요!'\n"
+            "   - 예: '가장 끊기 힘든 대인관계 유형은 무엇이었나요? 댓글로 남겨주세요!'\n"
+            "   - 출력 JSON의 \"comment_cta\" 필드에 이 문장을 단독으로 담아주세요.\n"
+            "   - 또한, \"full_script\"의 가장 마지막에 이 comment_cta 문장을 자연스럽게 덧붙여서 전체 나레이션 대본이 완결되도록 작성해 주세요. (즉, full_script = hook + body + cta + comment_cta 형태가 되어야 하며, 마지막에 반드시 이 댓글 공유 요청이 들려야 합니다.)"
+        )
+        
+        old_json_part = '"cta": "마무리 CTA 1문장 (실용적 행동 유도)",'
+        new_json_part = '"cta": "마무리 CTA 1문장 (실용적 행동 유도)",\n  "comment_cta": "주제에 자연스럽게 녹아드는 1문장의 댓글 공유 요청 멘트 (예: \'여러분은 ~해보셨나요? 댓글로 공유해주세요!\')", '
+        
+        if old_json_part in prompt:
+            prompt = prompt.replace(old_json_part, new_json_part)
+            
+        if "## 출력 형식" in prompt:
+            prompt = prompt.replace("## 출력 형식", comment_instruction + "\n\n## 출력 형식")
+        else:
+            prompt = prompt + "\n" + comment_instruction
+        
         models = []
         seen = set()
         for m in [self.model_name] + self.fallback_models:
@@ -773,8 +794,14 @@ SNS 캡션 규칙:
         
         data['search_keyword'] = data['search_keywords'][0]
         
-        # ─── ★ 나레이션 + 자막에 블로그 CTA append ───
-        data['full_script'] = data['full_script'].rstrip() + ' ' + BLOG_CTA_NARRATION
+        # ─── ★ 나레이션 + 자막에 동적 댓글 CTA append ───
+        comment_cta = data.get('comment_cta', '').strip()
+        if not comment_cta:
+            comment_cta = '당신의 경험을 댓글로 공유해 주세요!'
+            data['comment_cta'] = comment_cta
+            
+        if comment_cta not in data['full_script']:
+            data['full_script'] = data['full_script'].rstrip() + ' ' + comment_cta
 
         # ─── ★ SNS 캡션 + 해시태그 정규화 (v6.3) ───
         data = self._normalize_sns_captions(data)

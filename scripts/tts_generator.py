@@ -114,23 +114,53 @@ class TTSGenerator:
 
         try:
             if segments and len(segments) > 0:
-                return self._generate_with_segments(
+                result = self._generate_with_segments(
                     segments, output_path, language, tts_config,
                     target_duration, max_duration
                 )
-
-            return self._generate_simple(
-                text, output_path, language, tts_config,
-                target_duration, max_duration
-            )
+            else:
+                result = self._generate_simple(
+                    text, output_path, language, tts_config,
+                    target_duration, max_duration
+                )
 
         except Exception as e:
             logger.error(f"Edge TTS 실패: {e}")
             logger.info("gTTS 폴백 시도...")
-            return self._generate_gtts_fallback(
+            result = self._generate_gtts_fallback(
                 text, output_path, language, tts_config,
                 target_duration, max_duration
             )
+
+        # ─── 썸네일 노출 시간(0.3초) 확보를 위한 나레이션 딜레이(0.3초 침묵) 및 자막 싱크 조정 ───
+        delay_sec = 0.3
+        try:
+            output_file, final_duration, timed_segments = result
+            
+            # 1. 오디오 파일에 0.3초 침묵 추가
+            audio = AudioSegment.from_file(output_file)
+            silence = AudioSegment.silent(duration=int(delay_sec * 1000))
+            delayed_audio = silence + audio
+            delayed_audio.export(output_file, format='mp3', bitrate='192k' if 'edge' in str(output_file) else '128k')
+            
+            # 2. 타이밍 세그먼트의 시간들을 +0.3초 시프트
+            shifted_segments = []
+            if timed_segments:
+                for seg in timed_segments:
+                    shifted_seg = seg.copy()
+                    shifted_seg['start'] = round(seg['start'] + delay_sec, 2)
+                    shifted_seg['end'] = round(seg['end'] + delay_sec, 2)
+                    shifted_segments.append(shifted_seg)
+            else:
+                shifted_segments = None
+                
+            final_duration = final_duration + delay_sec
+            logger.info(f"  [포스트 프로세싱] 썸네일 영역 확보를 위해 나레이션 {delay_sec}초 딜레이 적용 완료 (최종 오디오 길이: {final_duration:.1f}초)")
+            
+            return output_file, final_duration, shifted_segments
+        except Exception as e:
+            logger.error(f"  [포스트 프로세싱] 나레이션 딜레이 적용 중 오류 발생: {e}")
+            return result
 
     # ─── Edge TTS 코어 ───
 

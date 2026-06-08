@@ -283,6 +283,21 @@ def generate_upload_metadata(script_data, config, language='ko', weekday=None):
     desc_body = script_data.get('description', '')
     hook = script_data.get('hook', '')
     
+    # 새로운 주제에 맞는 제미나이 생성 동적 해시태그 파싱 (instagram_hashtags 사용)
+    dynamic_hashtags = script_data.get('instagram_hashtags', [])
+    if isinstance(dynamic_hashtags, str):
+        dynamic_tags = [t.strip() for t in dynamic_hashtags.split() if t.strip()]
+    elif isinstance(dynamic_hashtags, list):
+        dynamic_tags = [t.strip() for t in dynamic_hashtags if t.strip()]
+    else:
+        dynamic_tags = []
+        
+    # 해시태그 형식(#태그)으로 가공
+    dynamic_hash_str = " ".join([f"#{t.replace('#', '')}" for t in dynamic_tags])
+    
+    # 기존 카테고리 고정 해시태그와 주제별 동적 해시태그 혼합
+    combined_hashtags = f"{hashtags} {dynamic_hash_str}".strip()
+    
     description = f"""{hook}
 
 {desc_body}
@@ -291,10 +306,10 @@ def generate_upload_metadata(script_data, config, language='ko', weekday=None):
 
 {footer}
 
-{hashtags}"""
+{combined_hashtags}"""
     
     # ─── 태그 ───
-    tag_text = hashtags.replace('#', '')
+    tag_text = combined_hashtags.replace('#', '')
     tags = [t.strip() for t in tag_text.split() if t.strip()]
     
     if language == 'ko':

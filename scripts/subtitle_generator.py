@@ -16,7 +16,7 @@ class SubtitleGenerator:
         logger.info("SubtitleGenerator v2 초기화 (음성 기반 싱크)")
     
     def generate(self, output_path, language='ko', 
-                 total_duration=30, timed_segments=None):
+                 total_duration=30, timed_segments=None, thumbnail_hook=None):
         """
         ASS 자막 파일 생성 (TTS 실측 타이밍 기반)
         
@@ -65,7 +65,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
         if timed_segments and len(timed_segments) > 0:
             logger.info(f"자막 타이밍: TTS 실측 기반 ({len(timed_segments)}개)")
             ass_content += self._build_events_from_timed(
-                timed_segments, max_chars, language
+                timed_segments, max_chars, language, thumbnail_hook
             )
         else:
             logger.error("❌ timed_segments가 없습니다! 자막 생성 불가")
@@ -79,9 +79,18 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
         logger.info(f"자막 생성 완료: {output_path} ({seg_count}개 세그먼트)")
         return output_path
     
-    def _build_events_from_timed(self, timed_segments, max_chars, language):
+    def _build_events_from_timed(self, timed_segments, max_chars, language, thumbnail_hook=None):
         """TTS 실측 타이밍 기반 자막 이벤트 생성"""
         events = ""
+        
+        # ── 썸네일 후킹 자막 추가 (영상 맨 앞 0.0 ~ 0.3초) ──
+        if thumbnail_hook:
+            lines = split_text_for_subtitle(thumbnail_hook, language, max_chars)
+            display_text = '\\N'.join(lines)
+            start_str = self._format_time(0.0)
+            end_str = self._format_time(0.3)
+            # 썸네일 노출용이므로 페이드 없이 즉시 노출
+            events += f"Dialogue: 0,{start_str},{end_str},Highlight,,0,0,0,,{display_text}\n"
         
         for i, seg in enumerate(timed_segments):
             text = seg.get('text', '')
@@ -90,6 +99,12 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
             
             if not text:
                 continue
+            
+            # 첫 번째 나레이션 자막은 썸네일 후킹 자막과 겹치지 않게 최소 0.3초 이후에 나오도록 설정
+            if i == 0:
+                start = max(start, 0.3)
+                if end <= start:
+                    end = start + 2.0
             
             # 자막 줄바꿈
             lines = split_text_for_subtitle(text, language, max_chars)
@@ -114,5 +129,5 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
         hours = int(seconds // 3600)
         minutes = int((seconds % 3600) // 60)
         secs = int(seconds % 60)
-        centisecs = int((seconds % 1) * 100)
+        centisecs = int(round((seconds % 1) * 100))
         return f"{hours}:{minutes:02d}:{secs:02d}.{centisecs:02d}"

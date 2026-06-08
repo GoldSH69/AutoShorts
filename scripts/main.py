@@ -200,6 +200,7 @@ def main():
             language=language,
             total_duration=narration_duration,
             timed_segments=timed_segments,
+            thumbnail_hook=script_data.get('thumbnail_hook', ''),
         )
         
         # ─── Step 5: BGM 선택 ───
