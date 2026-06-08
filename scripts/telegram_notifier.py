@@ -44,6 +44,16 @@ class TelegramNotifier:
         category_name = self.config.get_category_name(weekday, language)
         title = script_data.get('title', '제목 없음') if script_data else '제목 없음'
         
+        # 순차 정보 및 썸네일 훅 추출
+        no = script_data.get('no', 1) if script_data else 1
+        thumbnail_hook = script_data.get('thumbnail_hook', '설정 없음') if script_data else '설정 없음'
+        
+        # 남은 주제 개수 계산 및 경고 추가
+        remaining = 30 - no
+        warning_line = ""
+        if remaining <= 3:
+            warning_line = f"\n⚠️ 경고: [{category_name}] 남은 주제가 {remaining}개뿐입니다. (주제 충전 필요!)\n"
+        
         # 업로드 상태
         if upload_result and upload_result.get('video_id'):
             upload_status = f"✅ 자동 업로드 완료 ({upload_result.get('privacy', 'public')})"
@@ -70,16 +80,17 @@ class TelegramNotifier:
 {hashtags}"""
         
         message = f"""✅ [뇌를 깨우는 30초] 영상 생성 완료!
-
+ 
 📅 {get_today_str()} ({get_weekday_name_ko()})
 🌐 언어: {'🇰🇷 한국어' if language == 'ko' else '🇺🇸 영어'}
-📂 카테고리: {emoji} {category_name}
+📂 카테고리: {emoji} {category_name} (No. {no})
 📝 제목: {title}
+🖼️ 썸네일 후킹: {thumbnail_hook}
 ⏱ 길이: {duration_str}
 🎵 BGM: {bgm_str}
 📤 업로드: {upload_status}
 {link_line}
-{meta_info}
+{meta_info}{warning_line}
 {BLOG_FOOTER_TELEGRAM}"""
         
         # ① 메인 상태 메시지 전송

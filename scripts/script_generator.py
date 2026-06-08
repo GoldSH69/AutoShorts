@@ -30,175 +30,7 @@ BLOG_FOOTER_TIKTOK = "🧠 더 많은 심리학 콘텐츠 → 프로필 링크!"
 SCRIPT_MIN_CHARS = 260
 SCRIPT_MAX_CHARS = 320
 
-# ─── 카테고리별 소재 목록 (프롬프트 소재와 동일) ───
-CATEGORY_TOPICS = {
-    'money': [
-        '심적 회계(Mental Accounting)',
-        '매몰비용 오류',
-        '앵커링 효과와 세일 가격',
-        '라떼 팩터와 복리',
-        '카드 vs 현금 결제 심리',
-        '손실회피 (카너먼-트버스키)',
-        '파킨슨의 법칙 수입편',
-        '현재편향과 저축',
-        '사회적 비교와 소비',
-        '무료의 심리학 (댄 애리얼리)',
-        '선택 과부하와 투자',
-        '72의 법칙',
-        '50-30-20 법칙 심리학',
-        '현금할인과 심리적 괴리감',
-        '구독경제와 습관적 지출',
-        '복권 구매와 확률 오판',
-        '세일 종료 임박 효과',
-        '페이백과 심리적 계정',
-        '투자 손절 타이밍의 뇌과학',
-        '무이자 할부의 착각',
-        '소비 충동과 세로토닌',
-        '재테크 성공 루틴 3가지',
-    ],
-    'success': [
-        '의도적 연습(Deliberate Practice)',
-        '성장 마인드셋 (캐롤 드웩)',
-        '시각화의 뇌과학',
-        '5초 법칙 (멜 로빈스)',
-        '습관 루프 (찰스 두히그)',
-        '파킨슨의 법칙',
-        '지연된 보상 (마시멜로 실험)',
-        '아침 루틴의 뇌과학',
-        '실패 편향',
-        '목표 설정 SMART vs 구현 의도',
-        '환경 설계와 습관',
-        '새벽 기상과 의지력 연구',
-        '성공한 사람의 독서법',
-        '워렌 버핏의 5/25 법칙',
-        '타인의 성공을 축하하는 법',
-        '역경 지수(Adversity Quotient)',
-        '성공 시각화의 fMRI 증거',
-        '일일 톱3 우선순위 법칙',
-        '실패 대비 플랜B 심리',
-        '롤모델 효과와 거울 뉴런',
-        '작은 성공 기록의 힘',
-    ],
-    'brain': [
-        '도파민 디톡스',
-        '포모도로 25분 전두엽',
-        '아침 햇빛 세로토닌',
-        '운동 20분 BDNF',
-        '멀티태스킹 인지 비용',
-        '90분 울트라디안 리듬',
-        '낮잠 20분 NASA 연구',
-        '냉수 샤워 노르에피네프린',
-        '명상 8주 편도체 (하버드)',
-        '씹는 행위 코르티솔',
-        '2분 규칙 전두엽',
-        '수면 글림프 시스템',
-        '미각과 기억의 해마 연결',
-        '웃음과 엔돌핀 분비',
-        '스트레스와 전두엽 마비',
-        '유산소 운동과 해마 크기',
-        '수면 부족과 감정 조절',
-        '손 글씨 쓰기가 인지 기능 향상',
-        '뉴로피드백 자기 조절',
-        '음악과 도파민 예측 오류',
-        '뇌 가소성과 언어 학습',
-        '카페인이 집중력에 미치는 진실',
-    ],
-    'dark': [
-        '상호성 원리 (치알디니)',
-        '문간에 발 들이기(Foot-in-the-door)',
-        '사회적 증거',
-        '희소성 원리',
-        '권위 편향 (밀그램)',
-        '가스라이팅 3단계',
-        '미러링 기법',
-        '프레이밍 효과',
-        '닻내리기(Anchoring)',
-        '칵테일 파티 효과',
-        '벤자민 프랭클린 효과',
-        '네 가지 얼음 실험 (밀그램 변형)',
-        '침묵의 스피랄 효과',
-        '드리프트 결정론 (합리화 패턴)',
-        '정서적 블랙메일 4단계',
-        '과잉보상 심리 (나르시시즘)',
-        '사이코패스의 미러링 기술',
-        '공감 피로와 냉담화',
-        '양가적 섹시즘 함정',
-        '인지적 일관성 강제',
-        '사회적 배제와 침묵의 벽',
-    ],
-    'hack': [
-        '구현 의도(Implementation Intention)',
-        '2분 규칙',
-        '습관 스태킹 (제임스 클리어)',
-        '자아 고갈(Ego Depletion)',
-        '환경 설계 선택 설계',
-        '작은 승리(Small Wins) 도파민',
-        '자기 효능감 (반두라)',
-        '세이렌 서버(Ulysses Contract)',
-        '파킨슨의 법칙 데드라인',
-        '시각화의 함정',
-        '자기 자비(Self-Compassion)',
-        '5분 스트레칭과 코르티솔',
-        '감사 일기 3가지 효과',
-        '화이트 노이즈 집중력',
-        '아침 페이지 기적',
-        '거절 연습의 심리학',
-        '핸드폰 그레이스케일 트릭',
-        '복식 호흡과 미주 신경',
-        '원 포커스 타이머',
-        '미라클 모닝 루틴',
-        '디지털 최소주의 선언',
-    ],
-    'love': [
-        # '호감 무의식 신호 (미러링)',  # 2026-05-18: 미러링 주제 반복 문제로 당분간 제외
-        '밀당 희소성 원리 간헐적 강화',
-        '첫인상 7초 후광효과',
-        '연락 불확실성 집착 심리',
-        '이별 후 손실회피 심리',
-        '썸에서 관계로 결정적 행동',
-        '질투 편도체 활성화',
-        '커플 5:1 비율 (가트만)',
-        '익숙함과 설렘의 심리학',
-        '고백 타이밍 피크엔드 법칙',
-        '눈 맞춤 3초 법칙',
-        '공포 영화 데이트 오귀인 이론',
-        '로미오와 줄리엣 효과',
-        '연애 주도권 게임 이론',
-        '이별 통보 후 3단계 심리',
-        '소울메이트 신화의 함정',
-        '질투 유발의 역효과',
-        '첫 메시지 2:1 법칙',
-        '데이트 장소 선택의 심리',
-        '관계 중독과 경계선',
-        '짝사랑과 도파민 중독',
-        '이별 후 회복의 6단계',
-        '친구에서 연인으로 전환 신호',
-    ],
-    'relationship': [
-        '가트만 4기수',
-        '5:1 긍정적 상호작용 비율',
-        '비폭력 대화(NVC)',
-        '애착 이론 불안형 회피형',
-        '경청 옥시토신',
-        '초두효과 대화 3분',
-        '자기 노출 법칙 47%',
-        '감정 코칭 갈등 65% 감소',
-        '심리적 안전감 (구글)',
-        '투사(Projection)',
-        '역설적 변화 이론',
-        '메타 대화',
-        '삼각관계 심리 역학',
-        '표정 읽기와 교감 신경',
-        '사과의 5가지 언어',
-        '용서의 신경과학 (전전두엽)',
-        '관계 루틴 레시피',
-        '갈등 해결 10초 법칙',
-        '감정 전염과 분위기 조절',
-        '적극적 경청의 3단계',
-        '관계 만족도 일기',
-        '경계 설정의 심리적 이득',
-    ],
-}
+# ─── 카테고리별 소재 목록 삭제됨 (config/topics.json 참조) ───
 
 # thinking 모델 판별
 THINKING_MODELS = {
@@ -219,7 +51,7 @@ PLATFORM_TAGS_TO_REMOVE = {
 TIKTOK_ALLOWED_TAGS = {"#fyp", "#foryou", "#foryoupage"}
 
 INSTAGRAM_HASHTAG_LIMIT = 5
-TIKTOK_HASHTAG_LIMIT = 7
+TIKTOK_HASHTAG_LIMIT = 5
 
 # 해시태그 최소 보장용 기본 풀
 DEFAULT_HASHTAGS_KO = [
@@ -261,7 +93,14 @@ class ScriptGenerator:
         
         self.project_root = get_project_root()
         
-        logger.info(f"ScriptGenerator v6.3 초기화 (캡션 해시태그 완전 제거)")
+        # topics.json 로드
+        self.topics_file = self.project_root / "config" / "topics.json"
+        self.topics_data = read_json(self.topics_file)
+        if not self.topics_data:
+            logger.warning("topics.json 파일이 없거나 비어 있습니다.")
+            self.topics_data = {}
+            
+        logger.info(f"ScriptGenerator v6.3 초기화 (요일별 순차 처리 적용)")
         logger.info(f"  주력 모델: {self.model_name} (thinking: {is_thinking_model(self.model_name)})")
         logger.info(f"  백업 모델: {self.fallback_models}")
         logger.info(f"  max_output_tokens: {self.max_tokens}")
@@ -368,6 +207,7 @@ SNS 캡션 규칙:
             'category': category_id,
             'title': topic_data.get('title', ''),
             'hash': generate_hash(topic_data.get('full_script', '')),
+            'no': topic_data.get('no', 1),
         })
         
         if len(history['topics']) > max_records:
@@ -375,7 +215,7 @@ SNS 캡션 규칙:
         
         history['last_updated'] = get_today_str()
         write_json(history_file, history)
-        logger.info(f"히스토리 저장 (총 {len(history['topics'])}개)")
+        logger.info(f"히스토리 저장 (총 {len(history['topics'])}개, 번호: {topic_data.get('no', 1)})")
     
     def _get_previous_topics(self, category_id):
         history = self._load_history()
@@ -386,48 +226,49 @@ SNS 캡션 규칙:
             return "아직 없음"
         return '\n'.join([f"- {t.get('title', '')}" for t in recent])
 
-    def _select_forced_topic(self, category_id):
+    def _select_sequential_topic(self, category_id):
         """
-        🆕 v6.5 소재 강제 선택
-        - 이전에 다룬 주제와 겹치지 않는 소재를 랜덤 선택
-        - 모든 소재를 다 사용했으면 가장 오래된 것부터 재사용
+        요일별 순차 주제 선택
+        - 히스토리 파일에서 해당 카테고리의 마지막 실행 번호(no)를 조회
+        - next_no = last_no + 1
+        - next_no가 카테고리의 주제 개수를 초과하면 1로 순환
+        - 해당 번호의 주제와 썸네일 후킹 문구를 반환
         """
-        import random
-        
-        topics_pool = CATEGORY_TOPICS.get(category_id, [])
-        if not topics_pool:
-            logger.warning(f"  카테고리 '{category_id}'의 소재 목록 없음")
-            return "자유 주제 선택"
-        
-        # 이전 주제 키워드 추출
+        category_topics = self.topics_data.get(category_id, [])
+        if not category_topics:
+            logger.warning(f"  카테고리 '{category_id}'의 순차 주제 목록이 없습니다.")
+            return 1, "자유 주제", "자유 주제 후킹"
+
+        # 히스토리 로드 및 해당 카테고리 최신 이력 탐색
         history = self._load_history()
         previous = history.get('topics', [])
         same_cat = [t for t in previous if t.get('category') == category_id]
-        recent_titles = [t.get('title', '').lower() for t in same_cat[-30:]]
         
-        # 사용 안 한 소재 필터링
-        unused = []
-        for topic in topics_pool:
-            topic_keywords = topic.lower().split()
-            # 이전 제목에 핵심 키워드가 포함되어 있는지 체크
-            used = False
-            for title in recent_titles:
-                match_count = sum(1 for kw in topic_keywords if kw in title)
-                if match_count >= 1:  # 키워드 1개(<-2개 변경 26.05.12) 이상 겹치면 사용된 것으로 판단
-                    used = True
+        # 마지막으로 진행된 번호 찾기 (뒤에서부터 탐색)
+        last_no = 0
+        for record in reversed(same_cat):
+            if 'no' in record:
+                try:
+                    last_no = int(record['no'])
                     break
-            if not used:
-                unused.append(topic)
-        
-        if unused:
-            selected = random.choice(unused)
-            logger.info(f"  🎯 소재 선택: '{selected}' (미사용 {len(unused)}개 중)")
-        else:
-            # 모든 소재 사용됨 → 가장 오래된 것부터 재사용
-            selected = random.choice(topics_pool)
-            logger.info(f"  🔄 소재 재사용: '{selected}' (모든 소재 사용됨, 랜덤 선택)")
-        
-        return selected
+                except (ValueError, TypeError):
+                    continue
+
+        next_no = last_no + 1
+        if next_no > len(category_topics):
+            logger.info(f"  🔄 모든 주제({len(category_topics)}개)가 소진되어 1번으로 순환합니다.")
+            next_no = 1
+
+        topic_entry = category_topics[next_no - 1]
+        selected_no = topic_entry.get('no', next_no)
+        selected_topic = topic_entry.get('topic', '')
+        selected_hook = topic_entry.get('thumbnail_hook', '')
+
+        logger.info(f"  🎯 순차 주제 선택: [{category_id}] 번호 {selected_no}/{len(category_topics)}")
+        logger.info(f"     주제: '{selected_topic}'")
+        logger.info(f"     썸네일 후킹: '{selected_hook}'")
+
+        return selected_no, selected_topic, selected_hook
         
     # ─── Gemini API 호출 ───
     
@@ -751,7 +592,7 @@ SNS 캡션 규칙:
     # ─── 메인 생성 ───
     
     def generate(self, category_id=None, weekday=None, language='ko', save_history=True):
-        """스크립트 생성 (v6.5 - 소재 강제 지정 + 중복 체크)"""
+        """스크립트 생성 (v6.5 - 요일별 순차 지정 + 중복 체크)"""
         
         if category_id is None:
             category_id = self.config.get_category_id(weekday)
@@ -761,12 +602,15 @@ SNS 캡션 규칙:
         template = self._load_prompt_template(category_id, language)
         previous_topics = self._get_previous_topics(category_id)
         
-        # 🆕 v6.5: 소재 강제 선택
-        forced_topic = self._select_forced_topic(category_id)
+        # 요일별 순차 주제 선택
+        selected_no, forced_topic, thumbnail_hook = self._select_sequential_topic(category_id)
+        self.selected_no = selected_no
+        self.selected_thumbnail_hook = thumbnail_hook
         
         # 프롬프트 변수 치환
         prompt = template.replace('{previous_topics}', previous_topics)
         prompt = prompt.replace('{forced_topic}', forced_topic)
+        prompt = prompt.replace('{thumbnail_hook}', thumbnail_hook)
         prompt = prompt.replace('{min_chars}', str(SCRIPT_MIN_CHARS))
         prompt = prompt.replace('{max_chars}', str(SCRIPT_MAX_CHARS))
         
@@ -780,15 +624,11 @@ SNS 캡션 규칙:
         logger.info(f"시도할 모델: {models}")
         
         result = None
-        max_dedup_attempts = 3  # 🆕 중복 시 최대 재시도
+        max_dedup_attempts = 3  # 중복 시 최대 재시도
         
         for dedup_attempt in range(max_dedup_attempts):
             if dedup_attempt > 0:
-                # 재시도 시 다른 소재 선택
-                forced_topic = self._select_forced_topic(category_id)
-                prompt = template.replace('{previous_topics}', previous_topics)
-                prompt = prompt.replace('{forced_topic}', forced_topic)
-                logger.info(f"  🔄 중복 감지, 소재 변경: '{forced_topic}' (시도 {dedup_attempt+1})")
+                logger.info(f"  🔄 중복 감지, 동일 소재로 재작성 시도: '{forced_topic}' (시도 {dedup_attempt+1})")
             
             for model_name in models:
                 logger.info(f"\n{'─'*50}")
@@ -840,9 +680,14 @@ SNS 캡션 규칙:
             logger.error("❌ 모든 모델에서 실패!")
             raise Exception("스크립트 생성 실패: 사용 가능한 모델 없음")
         
+        # 순차 정보와 썸네일 훅 강제 삽입
+        result['no'] = self.selected_no
+        result['thumbnail_hook'] = self.selected_thumbnail_hook
+        
         logger.info(f"\n✅ 스크립트 생성 성공!")
         logger.info(f"  제목: {result.get('title', '')}")
-        logger.info(f"  지정 소재: {forced_topic}")
+        logger.info(f"  지정 소재: {forced_topic} (No. {result.get('no')})")
+        logger.info(f"  썸네일 후킹: {result.get('thumbnail_hook')}")
         logger.info(f"  스크립트: {result.get('full_script', '')[:80]}...")
         logger.info(f"  검색 키워드: {result.get('search_keywords', [])}")
         logger.info(f"  인스타 캡션: {'있음' if result.get('instagram_caption') else '기본값'}")
@@ -933,6 +778,10 @@ SNS 캡션 규칙:
 
         # ─── ★ SNS 캡션 + 해시태그 정규화 (v6.3) ───
         data = self._normalize_sns_captions(data)
+        
+        # 순차 연동 정보 및 썸네일 후킹 주입
+        data['no'] = self.selected_no
+        data['thumbnail_hook'] = self.selected_thumbnail_hook
         
         ig_count = len(data['instagram_hashtags'].split()) if isinstance(data['instagram_hashtags'], str) else len(data['instagram_hashtags'])
         tt_count = len(data['tiktok_hashtags'].split()) if isinstance(data['tiktok_hashtags'], str) else len(data['tiktok_hashtags'])

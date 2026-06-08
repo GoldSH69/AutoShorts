@@ -129,6 +129,8 @@ def main():
         )
         
         logger.info(f"  제목: {script_data.get('title', '')}")
+        logger.info(f"  순차 번호: {script_data.get('no', '')} / 30")
+        logger.info(f"  썸네일 후킹: {script_data.get('thumbnail_hook', '')}")
         logger.info(f"  스크립트: {script_data.get('full_script', '')[:80]}...")
         
         # 키워드 확인
