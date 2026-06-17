@@ -74,7 +74,14 @@ class TTSGenerator:
         self.video_config = config.get_video_config()
         self.category_id = category_id
         self._voice = self._resolve_voice(category_id)
-        logger.info(f"TTSGenerator v4.2 초기화 (engine: edge-tts, voice: {self._voice})")
+        
+        # [오디오 지문 변조] 무작위 피치 및 레이트 오프셋 결정
+        import random
+        self._random_pitch = f"{random.randint(-2, 2):+d}Hz"
+        self._random_rate_offset = random.randint(-2, 3)
+        
+        logger.info(f"TTSGenerator v4.3 초기화 (engine: edge-tts, voice: {self._voice})")
+        logger.info(f"  [음성 변조] 랜덤 피치: {self._random_pitch}, 랜덤 레이트 오프셋: {self._random_rate_offset:+d}%")
 
     def _resolve_voice(self, category_id):
         """카테고리 ID로 음성 결정"""
@@ -168,11 +175,17 @@ class TTSGenerator:
         """Edge TTS로 단일 텍스트를 파일로 변환"""
         import edge_tts
 
+        # 기본 계산된 rate에 무작위 rate_offset을 적용하여 파형 변조
+        rate_num = self._parse_rate(rate)
+        final_rate_percent = int((rate_num - 1.0) * 100) + self._random_rate_offset
+        final_rate_str = f"+{final_rate_percent}%" if final_rate_percent >= 0 else f"{final_rate_percent}%"
+
         async def _run():
             communicate = edge_tts.Communicate(
                 text=text,
                 voice=self._voice,
-                rate=rate
+                rate=final_rate_str,
+                pitch=self._random_pitch
             )
             await communicate.save(output_file)
 
