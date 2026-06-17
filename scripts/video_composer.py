@@ -40,6 +40,47 @@ class VideoComposer:
     
     # ─── 영상 정규화 (핵심!) ───
     
+    def _get_random_effects_filter(self, duration):
+        """임의의 색감 보정 및 Ken Burns(랜덤 줌인/줌아웃) 필터 문자열 생성"""
+        import random
+        
+        # 1. 색감 보정 (eq 필터 - 검열 회피용 미세 조절)
+        b = random.uniform(-0.02, 0.02)  # 밝기 미세 조정 (-0.02 ~ 0.02)
+        c = random.uniform(0.98, 1.02)   # 대비 미세 조정 (0.98 ~ 1.02)
+        s = random.uniform(0.97, 1.08)   # 채도 미세 조정 (0.97 ~ 1.08)
+        color_filter = f"eq=brightness={b:.3f}:contrast={c:.3f}:saturation={s:.3f}"
+        
+        # 2. Ken Burns 효과 (줌인/줌아웃 - 3%~6%의 미세하고 안정적인 줌)
+        k = random.uniform(0.03, 0.06)   # 줌 강도 (3% ~ 6%)
+        cx = random.uniform(0.4, 0.6)    # 가로 크롭 정렬 (중앙 부근 0.4~0.6)
+        cy = random.uniform(0.4, 0.6)    # 세로 크롭 정렬 (중앙 부근 0.4~0.6)
+        
+        zoom_type = random.choice(['in', 'out'])
+        
+        # duration이 너무 작을 경우를 대비해 최솟값 보장
+        safe_duration = max(0.5, duration)
+        
+        if zoom_type == 'in':
+            # 점진적 줌인
+            zoom_filter = (
+                f"crop=w='iw*(1-({k:.3f}*t/{safe_duration:.2f}))':"
+                f"h='ih*(1-({k:.3f}*t/{safe_duration:.2f}))':"
+                f"x='(iw-ow)*{cx:.3f}':"
+                f"y='(ih-oh)*{cy:.3f}',"
+                f"scale={self.width}:{self.height}"
+            )
+        else:
+            # 점진적 줌아웃
+            zoom_filter = (
+                f"crop=w='iw*(1-{k:.3f}+({k:.3f}*t/{safe_duration:.2f}))':"
+                f"h='ih*(1-{k:.3f}+({k:.3f}*t/{safe_duration:.2f}))':"
+                f"x='(iw-ow)*{cx:.3f}':"
+                f"y='(ih-oh)*{cy:.3f}',"
+                f"scale={self.width}:{self.height}"
+            )
+            
+        return f"{zoom_filter},{color_filter}"
+
     def _normalize_video(self, input_path, output_path):
         """
         배경 영상을 동일 fps/해상도/포맷으로 정규화
@@ -112,7 +153,8 @@ class VideoComposer:
                 loop_count = int(segment_duration / bg_duration) + 1
                 input_args = ['-stream_loop', str(loop_count)]
             
-            # 정규화 + 트림
+            # 정규화 + 트림 + 랜덤 효과 추가
+            effects_filter = self._get_random_effects_filter(segment_duration)
             cmd = [
                 self.ffmpeg_path, '-y',
             ] + input_args + [
@@ -121,6 +163,7 @@ class VideoComposer:
                     f'scale={self.width}:{self.height}:'
                     f'force_original_aspect_ratio=increase,'
                     f'crop={self.width}:{self.height},'
+                    f'{effects_filter},'
                     f'fps={self.fps},'
                     f'format=yuv420p,'
                     f'drawbox=0:0:{self.width}:{self.height}:'
@@ -392,11 +435,13 @@ class VideoComposer:
         cmd.extend(['-i', str(background_path)])
         cmd.extend(['-i', str(audio_path)])
         
+        effects_filter = self._get_random_effects_filter(target_duration)
         filter_parts = []
         
         filter_parts.append(
             f"[0:v]scale={self.width}:{self.height}:force_original_aspect_ratio=increase,"
             f"crop={self.width}:{self.height},"
+            f"{effects_filter},"
             f"fps={self.fps},"
             f"format=yuv420p,"
             f"setsar=1[scaled]"
