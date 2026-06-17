@@ -50,7 +50,7 @@ class VideoComposer:
         s = random.uniform(0.97, 1.08)   # 채도 미세 조정 (0.97 ~ 1.08)
         color_filter = f"eq=brightness={b:.3f}:contrast={c:.3f}:saturation={s:.3f}"
         
-        # 2. Ken Burns 효과 (줌인/줌아웃 - 3%~6%의 미세하고 안정적인 줌)
+        # 2. Ken Burns 효과 (zoompan 필터를 이용한 줌인/줌아웃 - 3%~6%의 미세하고 안정적인 줌)
         k = random.uniform(0.03, 0.06)   # 줌 강도 (3% ~ 6%)
         cx = random.uniform(0.4, 0.6)    # 가로 크롭 정렬 (중앙 부근 0.4~0.6)
         cy = random.uniform(0.4, 0.6)    # 세로 크롭 정렬 (중앙 부근 0.4~0.6)
@@ -59,24 +59,23 @@ class VideoComposer:
         
         # duration이 너무 작을 경우를 대비해 최솟값 보장
         safe_duration = max(0.5, duration)
+        total_frames = int(safe_duration * self.fps)
         
         if zoom_type == 'in':
             # 점진적 줌인
             zoom_filter = (
-                f"crop=w='iw*(1-({k:.3f}*t/{safe_duration:.2f}))':"
-                f"h='ih*(1-({k:.3f}*t/{safe_duration:.2f}))':"
-                f"x='(iw-ow)*{cx:.3f}':"
-                f"y='(ih-oh)*{cy:.3f}',"
-                f"scale={self.width}:{self.height}"
+                f"zoompan=z='max(1,1+{k:.3f}*on/{total_frames})':"
+                f"x='(iw-iw/zoom)*{cx:.3f}':"
+                f"y='(ih-ih/zoom)*{cy:.3f}':"
+                f"d=1:s={self.width}x{self.height}:fps={self.fps}"
             )
         else:
             # 점진적 줌아웃
             zoom_filter = (
-                f"crop=w='iw*(1-{k:.3f}+({k:.3f}*t/{safe_duration:.2f}))':"
-                f"h='ih*(1-{k:.3f}+({k:.3f}*t/{safe_duration:.2f}))':"
-                f"x='(iw-ow)*{cx:.3f}':"
-                f"y='(ih-oh)*{cy:.3f}',"
-                f"scale={self.width}:{self.height}"
+                f"zoompan=z='max(1,1+{k:.3f}-{k:.3f}*on/{total_frames})':"
+                f"x='(iw-iw/zoom)*{cx:.3f}':"
+                f"y='(ih-ih/zoom)*{cy:.3f}':"
+                f"d=1:s={self.width}x{self.height}:fps={self.fps}"
             )
             
         return f"{zoom_filter},{color_filter}"
@@ -163,8 +162,8 @@ class VideoComposer:
                     f'scale={self.width}:{self.height}:'
                     f'force_original_aspect_ratio=increase,'
                     f'crop={self.width}:{self.height},'
-                    f'{effects_filter},'
                     f'fps={self.fps},'
+                    f'{effects_filter},'
                     f'format=yuv420p,'
                     f'drawbox=0:0:{self.width}:{self.height}:'
                     f'color=black@{self.bg_opacity}:t=fill'
@@ -441,8 +440,8 @@ class VideoComposer:
         filter_parts.append(
             f"[0:v]scale={self.width}:{self.height}:force_original_aspect_ratio=increase,"
             f"crop={self.width}:{self.height},"
-            f"{effects_filter},"
             f"fps={self.fps},"
+            f"{effects_filter},"
             f"format=yuv420p,"
             f"setsar=1[scaled]"
         )
