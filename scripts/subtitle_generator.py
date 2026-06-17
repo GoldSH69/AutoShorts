@@ -56,6 +56,7 @@ WrapStyle: 0
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
 Style: Default,{font_name},{font_size},{font_color},&H000000FF,{outline_color},&H80000000,-1,0,0,0,100,100,0,0,1,{outline_width},{shadow_offset},{alignment},50,50,{margin_v},1
 Style: Highlight,{font_name},{int(font_size*1.1)},&H0000D4FF,&H000000FF,{outline_color},&H80000000,-1,0,0,0,100,100,0,0,1,{int(outline_width+1)},{shadow_offset},{alignment},50,50,{margin_v},1
+Style: Hook,{font_name},{int(font_size*1.5)},&H0000FFFF,&H000000FF,&H00000000,&H80000000,-1,0,0,0,100,100,0,0,1,{int(outline_width*1.5)},{int(shadow_offset*1.5)},{alignment},50,50,{margin_v},1
 
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
@@ -85,12 +86,17 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
         
         # ── 썸네일 후킹 자막 추가 (영상 맨 앞 0.0 ~ 0.3초) ──
         if thumbnail_hook:
-            lines = split_text_for_subtitle(thumbnail_hook, language, max_chars)
+            # 썸네일 후킹 자막은 문맥 맞게 줄바꿈(\n)이 포함된 경우 개행 유지
+            if '\n' in thumbnail_hook:
+                lines = [line.strip() for line in thumbnail_hook.split('\n') if line.strip()]
+            else:
+                hook_max_chars = 9 if language == 'ko' else 15
+                lines = split_text_for_subtitle(thumbnail_hook, language, hook_max_chars)
             display_text = '\\N'.join(lines)
             start_str = self._format_time(0.0)
             end_str = self._format_time(0.3)
-            # 썸네일 노출용이므로 페이드 없이 즉시 노출
-            events += f"Dialogue: 0,{start_str},{end_str},Highlight,,0,0,0,,{display_text}\n"
+            # Hook 스타일 적용
+            events += f"Dialogue: 0,{start_str},{end_str},Hook,,0,0,0,,{display_text}\n"
         
         for i, seg in enumerate(timed_segments):
             text = seg.get('text', '')

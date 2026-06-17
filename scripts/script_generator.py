@@ -701,9 +701,11 @@ SNS 캡션 규칙:
             logger.error("❌ 모든 모델에서 실패!")
             raise Exception("스크립트 생성 실패: 사용 가능한 모델 없음")
         
-        # 순차 정보와 썸네일 훅 강제 삽입
+        # 순차 정보와 썸네일 훅 강제 삽입 (제미나이가 생성한 값이 유효하지 않은 경우만 덮어씀)
         result['no'] = self.selected_no
-        result['thumbnail_hook'] = self.selected_thumbnail_hook
+        gemini_hook = result.get('thumbnail_hook', '').strip()
+        if not gemini_hook or '{thumbnail_hook}' in gemini_hook or gemini_hook == self.selected_thumbnail_hook:
+            result['thumbnail_hook'] = self.selected_thumbnail_hook
         
         logger.info(f"\n✅ 스크립트 생성 성공!")
         logger.info(f"  제목: {result.get('title', '')}")
@@ -808,7 +810,9 @@ SNS 캡션 규칙:
         
         # 순차 연동 정보 및 썸네일 후킹 주입
         data['no'] = self.selected_no
-        data['thumbnail_hook'] = self.selected_thumbnail_hook
+        gemini_hook = data.get('thumbnail_hook', '').strip()
+        if not gemini_hook or '{thumbnail_hook}' in gemini_hook or gemini_hook == self.selected_thumbnail_hook:
+            data['thumbnail_hook'] = self.selected_thumbnail_hook
         
         ig_count = len(data['instagram_hashtags'].split()) if isinstance(data['instagram_hashtags'], str) else len(data['instagram_hashtags'])
         tt_count = len(data['tiktok_hashtags'].split()) if isinstance(data['tiktok_hashtags'], str) else len(data['tiktok_hashtags'])
