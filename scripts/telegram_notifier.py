@@ -35,7 +35,8 @@ class TelegramNotifier:
     
     def send_success(self, video_path=None, script_data=None, 
                      upload_result=None, video_duration=None,
-                     language='ko', weekday=None, bgm_enabled=True):
+                     language='ko', weekday=None, bgm_enabled=True,
+                     youtube_metadata=None):
         """성공 알림 전송"""
         if not self.enabled:
             return False
@@ -72,12 +73,22 @@ class TelegramNotifier:
         # 업로드 메타데이터 (수동 업로드용)
         meta_info = ""
         if not upload_result and script_data:
-            hashtags = self.config.get_category_hashtags(weekday, language)
-            suggested_title = f"{emoji} {title} | {self.config.get_channel_name(language)}"
+            suggested_title = ""
+            suggested_desc = ""
+            if youtube_metadata:
+                suggested_title = youtube_metadata.get('title', '')
+                suggested_desc = youtube_metadata.get('description', '')
+            else:
+                hashtags = self.config.get_category_hashtags(weekday, language)
+                suggested_title = f"{emoji} {title} | {self.config.get_channel_name(language)}"
+                suggested_desc = hashtags
+                
             meta_info = f"""
 📋 수동 업로드 시 사용:
 제목: {suggested_title}
-{hashtags}"""
+
+설명:
+{suggested_desc}"""
         
         message = f"""✅ [뇌를 깨우는 30초] 영상 생성 완료!
  

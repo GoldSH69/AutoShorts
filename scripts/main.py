@@ -243,6 +243,18 @@ def main():
         logger.info(f"  영상 길이: {video_duration:.1f}초")
         
         # ─── Step 7: YouTube 업로드 ───
+        metadata = None
+        if script_data:
+            try:
+                metadata = generate_upload_metadata(
+                    script_data=script_data,
+                    config=config,
+                    language=language,
+                    weekday=weekday,
+                )
+            except Exception as e:
+                logger.error(f"  ❌ 메타데이터 생성 오류: {e}")
+
         if not args.skip_upload and not args.dry_run:
             logger.info("")
             logger.info("📤 Step 7: YouTube 업로드")
@@ -252,14 +264,7 @@ def main():
                 try:
                     uploader = YouTubeUploader(config)
                     
-                    if uploader.enabled:
-                        metadata = generate_upload_metadata(
-                            script_data=script_data,
-                            config=config,
-                            language=language,
-                            weekday=weekday,
-                        )
-                        
+                    if uploader.enabled and metadata:
                         logger.info(f"  제목: {metadata['title']}")
                         logger.info(f"  태그: {len(metadata['tags'])}개")
                         
@@ -301,6 +306,7 @@ def main():
                 language=language,
                 weekday=weekday,
                 bgm_enabled=bgm_enabled,
+                youtube_metadata=metadata,
             )
         
         # ─── 완료 ───
