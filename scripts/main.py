@@ -54,6 +54,21 @@ def main():
     else:
         config = Config()
     
+    # 예약 게시 명령행 인자 오버라이드
+    if args.schedule:
+        if 'upload' not in config._data:
+            config._data['upload'] = {}
+        if 'youtube' not in config._data['upload']:
+            config._data['upload']['youtube'] = {}
+        if 'scheduling' not in config._data['upload']['youtube']:
+            config._data['upload']['youtube']['scheduling'] = {}
+        config._data['upload']['youtube']['scheduling']['enabled'] = True
+        logger.info("⏰ 예약 게시 설정 강제 활성화 (--schedule)")
+    elif args.no_schedule:
+        if 'upload' in config._data and 'youtube' in config._data['upload'] and 'scheduling' in config._data['upload']['youtube']:
+            config._data['upload']['youtube']['scheduling']['enabled'] = False
+            logger.info("⏰ 예약 게시 설정 강제 비활성화 (--no-schedule)")
+    
     language = args.language
     
     # 🆕 히스토리 저장 여부

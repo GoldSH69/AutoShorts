@@ -175,6 +175,14 @@ def parse_args():
                        action='store_true',
                        help='히스토리 저장 안함 (테스트 시 오염 방지)')
     
+    parser.add_argument('--schedule',
+                       action='store_true',
+                       help='예약 게시 강제 활성화 (config 설정을 덮어씀)')
+    
+    parser.add_argument('--no-schedule',
+                       action='store_true',
+                       help='예약 게시 강제 비활성화 (config 설정을 덮어씀)')
+    
     parser.add_argument('--debug',
                        action='store_true',
                        help='디버그 모드')

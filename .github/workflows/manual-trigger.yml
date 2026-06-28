@@ -35,6 +35,11 @@ on:
         required: false
         default: false
         type: boolean
+      schedule:
+        description: '예약 게시 강제 활성화 (오후 5시 55분)'
+        required: false
+        default: true
+        type: boolean
       debug:
         description: '디버그 모드'
         required: false
@@ -108,6 +113,12 @@ jobs:
           # 🆕 히스토리 저장 여부
           if [ "${{ github.event.inputs.save_history }}" != "true" ]; then
             ARGS="$ARGS --no-history"
+          fi
+          
+          if [ "${{ github.event.inputs.schedule }}" = "true" ]; then
+            ARGS="$ARGS --schedule"
+          else
+            ARGS="$ARGS --no-schedule"
           fi
           
           if [ "${{ github.event.inputs.debug }}" = "true" ]; then
