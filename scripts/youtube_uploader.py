@@ -8,9 +8,10 @@ import sys
 import time
 import json
 import httplib2
+from datetime import datetime, timedelta
 from pathlib import Path
 
-from utils import logger, get_env
+from utils import logger, get_env, get_korea_now
 
 try:
     from google.oauth2.credentials import Credentials
@@ -130,6 +131,27 @@ class YouTubeUploader:
         made_for_kids = self.yt_config.get('made_for_kids', False)
         notify = self.yt_config.get('notify_subscribers', True)
         
+        # 예약 게시 설정 확인
+        scheduling_config = self.yt_config.get('scheduling', {})
+        scheduling_enabled = scheduling_config.get('enabled', False)
+        
+        publish_at = None
+        if scheduling_enabled:
+            sched_time_str = scheduling_config.get('time', '17:55')
+            try:
+                # Parse hour and minute
+                hour, minute = map(int, sched_time_str.split(':'))
+                now = get_korea_now()
+                target_time = now.replace(hour=hour, minute=minute, second=0, microsecond=0)
+                if now >= target_time:
+                    target_time += timedelta(days=1)
+                
+                publish_at = target_time.isoformat()
+                privacy = 'private'  # 예약 게시를 위해서는 반드시 비공개(private) 상태여야 함
+                logger.info(f"  예약 게시 설정: {publish_at} (비공개로 자동 설정)")
+            except Exception as e:
+                logger.error(f"예약 게시 시간 계산 실패 (일반 업로드 진행): {e}")
+        
         # 제목 길이 제한 (YouTube: 100자)
         if len(title) > 100:
             title = title[:97] + "..."
@@ -161,6 +183,9 @@ class YouTubeUploader:
                 'notifySubscribers': notify,
             },
         }
+        
+        if publish_at:
+            body['status']['publishAt'] = publish_at
         
         try:
             # 미디어 파일 준비
