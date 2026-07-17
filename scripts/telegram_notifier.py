@@ -130,9 +130,12 @@ class TelegramNotifier:
             logger.info("SNS 캡션 없음, 건너뜀")
             return
         
+        title_prefix = f"[{title}]\n\n" if title else ""
+        
         # ── 인스타그램 메시지 ──
         if ig_caption:
             ig_message = (
+                f"{title_prefix}"
                 f"{ig_caption}\n\n"
                 f"{ig_hashtags}"
             )
@@ -143,6 +146,7 @@ class TelegramNotifier:
         # ── 틱톡 메시지 ──
         if tk_caption:
             tk_message = (
+                f"{title_prefix}"
                 f"{tk_caption}\n\n"
                 f"{tk_hashtags}"
             )
