@@ -48,7 +48,7 @@ PLATFORM_TAGS_TO_REMOVE = {
 }
 
 # 틱톡에서는 허용할 태그
-TIKTOK_ALLOWED_TAGS = {"#fyp", "#foryou", "#foryoupage"}
+TIKTOK_ALLOWED_TAGS = {"#foryou", "#foryoupage"}
 
 INSTAGRAM_HASHTAG_LIMIT = 5
 TIKTOK_HASHTAG_LIMIT = 5
@@ -60,7 +60,7 @@ DEFAULT_HASHTAGS_KO = [
 ]
 
 TIKTOK_DEFAULT_HASHTAGS = [
-    "#심리학", "#자기계발", "#뇌과학", "#fyp", "#psychology", "#mindset",
+    "#심리학", "#자기계발", "#뇌과학", "#psychology", "#mindset",
 ]
 
 
@@ -180,7 +180,7 @@ SNS 캡션 규칙:
   "instagram_caption": "인스타그램 본문 3~5줄 (해시태그 넣지 말 것)",
   "instagram_hashtags": ["#주제태그1", "#주제태그2", "#주제태그3", "#영어태그1", "#영어태그2"],
   "tiktok_caption": "틱톡 후킹 1~2줄 (해시태그 넣지 말 것)",
-  "tiktok_hashtags": ["#주제태그1", "#주제태그2", "#주제태그3", "#fyp", "#영어태그1"]
+  "tiktok_hashtags": ["#주제태그1", "#주제태그2", "#주제태그3", "#영어태그1"]
 }}"""
     
     # ─── 히스토리 ───
