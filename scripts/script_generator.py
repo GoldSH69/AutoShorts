@@ -139,9 +139,10 @@ class ScriptGenerator:
 
 배경 영상 키워드 규칙:
 search_keywords는 Pexels에서 검색할 영어 키워드 3개를 배열로 생성하세요:
-- 각 키워드는 1~3단어의 영어 (예: "brain neuron", "thinking person", "dark abstract")
+- 각 키워드는 1~3단어의 영어 (예: "brain neuron", "thinking person", "romantic heterosexual couple")
 - 영상 내용의 분위기/주제와 맞는 키워드
-- 사람 얼굴 정면보다는 추상적/분위기 있는 영상 키워드 선호
+- 인물 등장 시 매력적인 남녀 커플 (attractive heterosexual couple, man and woman) 키워드 선호
+- ⚠️ 절대 금지: 동성 커플/키스 장면 (same sex, gay, men kissing 등 금지), 과도한 스킨십
 - 3개가 서로 다른 느낌이어야 함 (다양한 배경 전환을 위해)
 
 SNS 캡션 규칙:

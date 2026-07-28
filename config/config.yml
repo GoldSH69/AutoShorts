@@ -108,10 +108,10 @@ categories:
     hashtags_ko: "#연애심리 #호감신호 #여자심리 #shorts #연애 #심리학"
     hashtags_en: "#lovepsychology #attraction #dating #shorts #signals"
     search_terms:
-      - "couple silhouette sunset"
-      - "romantic city lights"
-      - "coffee date aesthetic"
-      - "holding hands close up"
+      - "romantic heterosexual couple"
+      - "attractive couple date"
+      - "beautiful man and woman smiling"
+      - "romantic sunset couple"
   6:
     id: "relationship"
     name_ko: "관계의 심리학"
@@ -120,10 +120,10 @@ categories:
     hashtags_ko: "#연애심리 #관계 #심리학 #shorts #연애 #대인관계"
     hashtags_en: "#relationships #dating #lovepsychology #shorts #signals"
     search_terms:
-      - "couple relationship"
-      - "people talking"
-      - "social connection"
-      - "romantic silhouette"
+      - "attractive man and woman talking"
+      - "romantic heterosexual couple"
+      - "social connection friends"
+      - "happy couple date"
 
 # ─── Gemini API ───
 gemini:

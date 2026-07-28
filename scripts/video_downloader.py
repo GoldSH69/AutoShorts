@@ -38,16 +38,24 @@ CATEGORY_KEYWORDS = {
         'goal planning', 'book reading', 'morning alarm'
     ],
     'love': [
-        'couple silhouette sunset', 'romantic city lights', 'coffee date aesthetic',
-        'holding hands close up', 'candlelight dinner', 'walking together evening',
-        'heart bokeh lights', 'love letter vintage', 'sunset beach couple'
+        'romantic heterosexual couple', 'attractive couple date',
+        'beautiful man and woman smiling', 'holding hands close up',
+        'candlelight dinner', 'walking together evening',
+        'heart bokeh lights', 'romantic sunset couple'
     ],
     'relationship': [
-        'couple silhouette', 'conversation cafe', 'holding hands',
-        'social connection', 'family together', 'friends laughing',
-        'heart love', 'communication talk', 'trust handshake'
+        'attractive man and woman talking', 'romantic heterosexual couple',
+        'holding hands', 'social connection', 'family together',
+        'friends laughing', 'communication talk', 'happy couple date'
     ],
 }
+
+# 차단 키워드 리스트 (동성 키스/스킨십, 제외 요청 요소 등)
+BLOCKED_TERMS = [
+    'gay', 'same sex', 'same-sex', 'lgbt', 'lgbtq',
+    'men kissing', 'man kissing man', 'male kiss', 'two men',
+    'black woman', 'african woman'
+]
 
 # 공통 백업 키워드 (모든 카테고리에서 사용 가능)
 UNIVERSAL_KEYWORDS = [
@@ -55,6 +63,22 @@ UNIVERSAL_KEYWORDS = [
     'slow motion abstract', 'dark particles', 'neon light abstract',
     'ocean waves calm', 'stars universe', 'rain window'
 ]
+
+
+def is_blocked_video(video_data):
+    """비디오 데이터(URL, 태그 등)에 차단 키워드가 포함되었는지 확인"""
+    if not isinstance(video_data, dict):
+        return False
+    raw_url = str(video_data.get('url', '')).lower()
+    normalized_url = raw_url.replace('-', ' ').replace('_', ' ')
+    tags = [str(t).lower().replace('-', ' ').replace('_', ' ') for t in video_data.get('tags', []) if isinstance(t, (str, dict))]
+    text_to_check = raw_url + " " + normalized_url + " " + " ".join(tags)
+    for term in BLOCKED_TERMS:
+        if term in text_to_check:
+            logger.warning(f"  [BLOCKED] 차단 키워드 감지 ('{term}'): 영상 제외 (URL: {raw_url})")
+            return True
+    return False
+
 
 
 class VideoDownloader:
@@ -260,6 +284,10 @@ class VideoDownloader:
                 width = video.get('width', 0)
                 height = video.get('height', 0)
                 
+                # 차단 키워드가 포함된 영상 제외
+                if is_blocked_video(video):
+                    continue
+
                 # 이미 사용한 영상 제외
                 if exclude_ids and video_id in exclude_ids:
                     continue
@@ -282,7 +310,7 @@ class VideoDownloader:
                         'duration': v.get('duration', 0),
                     }
                     for v in videos
-                    if not (exclude_ids and v.get('id', 0) in exclude_ids)
+                    if not is_blocked_video(v) and not (exclude_ids and v.get('id', 0) in exclude_ids)
                 ]
             
             if not suitable:
@@ -350,7 +378,15 @@ class VideoDownloader:
             if not hits:
                 return None
             
-            selected = random.choice(hits[:5])
+            suitable_hits = [
+                h for h in hits 
+                if not is_blocked_video({'url': h.get('pageURL', ''), 'tags': str(h.get('tags', '')).split(',')})
+            ]
+            if not suitable_hits:
+                logger.warning(f"  Pixabay 필터링 후 적절한 영상 없음: '{query}'")
+                return None
+            
+            selected = random.choice(suitable_hits[:min(5, len(suitable_hits))])
             
             videos = selected.get('videos', {})
             medium = videos.get('medium', {})

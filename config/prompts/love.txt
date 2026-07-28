@@ -69,9 +69,10 @@
 search_keywords는 Pexels에서 검색할 영어 키워드 3개를 배열로 생성하세요:
 - 각 키워드는 1~3단어의 영어
 - 연애/감성적 분위기에 맞는 영상 키워드
-- 사람 얼굴 정면보다는 실루엣/분위기 있는 키워드 선호
+- 인물 등장 시 매력적인 남녀 커플 (attractive heterosexual couple, man and woman) 중심 키워드 선호
+- ⚠️ 절대 금지: 동성 커플/키스 장면 (same sex, gay, men kissing 등 금지), 과도한 스킨십
 - 3개가 서로 다른 느낌이어야 함
-- 예시: ["couple silhouette sunset", "romantic city lights", "coffee date aesthetic"]
+- 예시: ["romantic heterosexual couple", "attractive couple date", "beautiful man and woman smiling"]
 
 ## SNS 캡션 규칙
 
