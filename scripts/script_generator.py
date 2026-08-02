@@ -702,11 +702,11 @@ SNS 캡션 규칙:
             logger.error("❌ 모든 모델에서 실패!")
             raise Exception("스크립트 생성 실패: 사용 가능한 모델 없음")
         
-        # 순차 정보와 썸네일 훅 강제 삽입 (제미나이가 생성한 값이 유효하지 않은 경우만 덮어씀)
+        # 순차 정보와 썸네일 훅 강제 삽입 (검증 실패 시 기획안 문구로 폴백)
         result['no'] = self.selected_no
-        gemini_hook = result.get('thumbnail_hook', '').strip()
-        if not gemini_hook or '{thumbnail_hook}' in gemini_hook or gemini_hook == self.selected_thumbnail_hook:
-            result['thumbnail_hook'] = self.selected_thumbnail_hook
+        result['thumbnail_hook'] = self._validate_thumbnail_hook(
+            result.get('thumbnail_hook', ''), self.selected_thumbnail_hook
+        )
         
         logger.info(f"\n✅ 스크립트 생성 성공!")
         logger.info(f"  제목: {result.get('title', '')}")
@@ -726,6 +726,58 @@ SNS 캡션 규칙:
         return result
     
     # ─── 검증 ───
+    
+    def _validate_thumbnail_hook(self, hook, fallback):
+        """
+        썸네일 후킹 문구 검증 및 정제 (v6.6)
+        - 템플릿 잔여물/이모지/특수문자 제거
+        - 길이 6~18자 (줄바꿈 제외) 검증
+        - 마침표/느낌표로 끝나는 서술형 문구 거부
+        - 기획안(정적) hook과 동일한 단순 복붙 거부
+        
+        Returns:
+            str: 정제된 hook. 유효하지 않으면 fallback(기획안 문구) 반환
+        """
+        if not hook:
+            return fallback
+        
+        # 템플릿 잔여물 제거/거부 (strip 이전에 검사해야 { } 제거 전에 감지)
+        if '{thumbnail_hook}' in hook or '지정된 썸네일' in hook or '참고용' in hook:
+            return fallback
+        
+        hook = hook.strip().strip('"\'()[]{}👉 \t\n')
+        
+        # 이모지 및 특수문자 제거
+        hook = re.sub(
+            r'[\U0001F300-\U0001FAFF\U00002600-\U000027BF\U0001F000-\U0001F02F'
+            r'\U0001F900-\U0001F9FF\u200d\ufe0f\u2190-\u21FF\u2B00-\u2BFF]',
+            '', hook
+        )
+        
+        # 줄바꿈/공백 정리
+        lines = [ln.strip() for ln in hook.split('\n') if ln.strip()]
+        if not lines:
+            return fallback
+        hook = '\n'.join(lines)
+        flat = hook.replace('\n', '').replace(' ', '')
+        
+        # 길이 검증 (6~18자)
+        if not (6 <= len(flat) <= 18):
+            logger.warning(f"  ⚠️ 후킹 길이 부적합 ({len(flat)}자): '{flat}'")
+            return fallback
+        
+        # 마침표/느낌표로 끝나는 서술형 문구 거부 (호기심을 남기지 않음)
+        if flat.rstrip().endswith(('.', '!', '~')):
+            logger.warning(f"  ⚠️ 후킹이 서술형/종결형: '{flat}'")
+            return fallback
+        
+        # 기획안(정적) hook과 동일하면 단순 복붙으로 판단
+        fallback_flat = fallback.replace('\n', '').replace(' ', '') if fallback else ''
+        if fallback_flat and flat == fallback_flat:
+            logger.warning(f"  ⚠️ 후킹이 기획안 문구와 동일 (단순 복붙): '{flat}'")
+            return fallback
+        
+        return hook
     
     def _validate_script(self, data):
         """스크립트 검증 (v6.3 - 캡션 해시태그 완전 제거)"""
@@ -809,11 +861,11 @@ SNS 캡션 규칙:
         # ─── ★ SNS 캡션 + 해시태그 정규화 (v6.3) ───
         data = self._normalize_sns_captions(data)
         
-        # 순차 연동 정보 및 썸네일 후킹 주입
+        # 순차 연동 정보 및 썸네일 후킹 주입 (검증 실패 시 기획안 문구로 폴백)
         data['no'] = self.selected_no
-        gemini_hook = data.get('thumbnail_hook', '').strip()
-        if not gemini_hook or '{thumbnail_hook}' in gemini_hook or gemini_hook == self.selected_thumbnail_hook:
-            data['thumbnail_hook'] = self.selected_thumbnail_hook
+        data['thumbnail_hook'] = self._validate_thumbnail_hook(
+            data.get('thumbnail_hook', ''), self.selected_thumbnail_hook
+        )
         
         ig_count = len(data['instagram_hashtags'].split()) if isinstance(data['instagram_hashtags'], str) else len(data['instagram_hashtags'])
         tt_count = len(data['tiktok_hashtags'].split()) if isinstance(data['tiktok_hashtags'], str) else len(data['tiktok_hashtags'])

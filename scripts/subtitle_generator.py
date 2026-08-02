@@ -95,8 +95,9 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
             display_text = '\\N'.join(lines)
             start_str = self._format_time(0.0)
             end_str = self._format_time(0.3)
-            # Hook 스타일 적용
-            events += f"Dialogue: 0,{start_str},{end_str},Hook,,0,0,0,,{display_text}\n"
+            # Hook 스타일 적용 + 페이드인 + 미세 확대 + 반짝 효과 (ASS 내장 태그, 무료)
+            hook_effect = "{\\fad(60,0)\\fscx115\\fscy115\\t(0,180,\\fscx100\\fscy100)}"
+            events += f"Dialogue: 0,{start_str},{end_str},Hook,,0,0,0,,{hook_effect}{display_text}\n"
         
         for i, seg in enumerate(timed_segments):
             text = seg.get('text', '')

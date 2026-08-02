@@ -10,6 +10,7 @@ v3.1 대비 변경:
 
 import os
 import math
+import random
 import subprocess
 import json
 import shutil
@@ -17,6 +18,19 @@ import tempfile
 from pathlib import Path
 from pydub import AudioSegment
 from utils import logger, ensure_dir
+
+# xfade 전환 효과 목록 (검열 회피 + 동적 편집 패턴 다변화)
+XFADE_TRANSITIONS = [
+    'fade', 'fadeblack', 'fadewhite',
+    'wipeleft', 'wiperight', 'slideup', 'slidedown',
+    'circleopen', 'circleclose',
+    'radial', 'smoothleft', 'smoothright', 'smoothup', 'smoothdown',
+    'hlslice', 'hrslice', 'vuslice', 'vdslice',
+]
+
+# 비네트/그레인 강도 범위 (눈에 거슬리지 않는 미세 수준)
+VIGNETTE_STRENGTH_RANGE = (0.15, 0.35)
+GRAIN_STRENGTH_RANGE = (12, 28)
 
 class VideoComposer:
     """FFmpeg 영상 합성기 v3.2 - fps 통일 + 다중 배경 전환"""
@@ -39,6 +53,23 @@ class VideoComposer:
         logger.info(f"  해상도: {self.width}x{self.height}, fps: {self.fps}")
     
     # ─── 영상 정규화 (핵심!) ───
+    
+    def _get_random_xfade_transition(self):
+        """xfade 전환 효과를 무작위 선택 (fade 중심이지만 다양하게)"""
+        # 50% 확률로 기본 fade, 나머지 50%는 다양한 효과 중 무작위
+        if random.random() < 0.5:
+            return 'fade'
+        return random.choice(XFADE_TRANSITIONS)
+    
+    def _get_vignette_grain_filter(self):
+        """미세 비네트 + 필름 그레인 노이즈 필터 문자열 (검열 회피용 픽셀 지문 무작위화)"""
+        # 비네트 (화면 테두리 미세 음영, 균일-가우시안 무작위)
+        v_strength = random.uniform(*VIGNETTE_STRENGTH_RANGE)
+        vignette_filter = f"vignette=angle=PI/5:mode=forward:aspect={self.width}/{self.height}:dither=no"
+        # 그레인 노이즈 (움직이는 미세 입자)
+        g_strength = random.uniform(*GRAIN_STRENGTH_RANGE)
+        noise_filter = f"noise=alls={g_strength:.0f}:allf=t+u"
+        return f"{vignette_filter},{noise_filter}"
     
     def _get_random_effects_filter(self, duration):
         """임의의 색감 보정 및 Ken Burns(랜덤 줌인/줌아웃) 필터 문자열 생성"""
@@ -320,32 +351,36 @@ class VideoComposer:
                     f"[{i}:v]trim=0:{trim_duration:.2f},setpts=PTS-STARTPTS[v{i}]"
                 )
             
-            # xfade 연결
+            # xfade 연결 (전환 효과 무작위화)
             if n == 2:
                 offset = max(0.1, segment_duration - fade)
+                trans = self._get_random_xfade_transition()
                 filter_parts.append(
-                    f"[v0][v1]xfade=transition=fade:duration={fade}:offset={offset:.2f}[merged]"
+                    f"[v0][v1]xfade=transition={trans}:duration={fade}:offset={offset:.2f}[merged]"
                 )
                 last_label = "merged"
                 
             elif n == 3:
                 # 첫 두 개 합치기
                 offset1 = max(0.1, segment_duration - fade)
+                trans1 = self._get_random_xfade_transition()
                 filter_parts.append(
-                    f"[v0][v1]xfade=transition=fade:duration={fade}:offset={offset1:.2f}[xf01]"
+                    f"[v0][v1]xfade=transition={trans1}:duration={fade}:offset={offset1:.2f}[xf01]"
                 )
                 # 세 번째 합치기
                 offset2 = max(offset1 + 0.1, segment_duration * 2 - fade * 2)
+                trans2 = self._get_random_xfade_transition()
                 filter_parts.append(
-                    f"[xf01][v2]xfade=transition=fade:duration={fade}:offset={offset2:.2f}[merged]"
+                    f"[xf01][v2]xfade=transition={trans2}:duration={fade}:offset={offset2:.2f}[merged]"
                 )
                 last_label = "merged"
                 
             elif n >= 4:
                 # 첫 두 개
                 offset = max(0.1, segment_duration - fade)
+                trans = self._get_random_xfade_transition()
                 filter_parts.append(
-                    f"[v0][v1]xfade=transition=fade:duration={fade}:offset={offset:.2f}[xf0]"
+                    f"[v0][v1]xfade=transition={trans}:duration={fade}:offset={offset:.2f}[xf0]"
                 )
                 
                 # 나머지 순차 연결
@@ -354,6 +389,7 @@ class VideoComposer:
                     # xfade 후 결과의 길이 = 이전 결과 + segment - fade
                     accumulated = segment_duration * i - fade * (i - 1)
                     curr_offset = max(0.1, accumulated - fade)
+                    trans_i = self._get_random_xfade_transition()
                     
                     if i == n - 1:
                         curr_label = "merged"
@@ -361,12 +397,19 @@ class VideoComposer:
                         curr_label = f"xf{i-1}"
                     
                     filter_parts.append(
-                        f"[{prev}][v{i}]xfade=transition=fade:duration={fade}:offset={curr_offset:.2f}[{curr_label}]"
+                        f"[{prev}][v{i}]xfade=transition={trans_i}:duration={fade}:offset={curr_offset:.2f}[{curr_label}]"
                     )
                 
                 last_label = "merged"
             else:
                 last_label = "v0"
+            
+            # 미세 비네트 + 필름 그레인 (픽셀 지문 무작위화)
+            vg = self._get_vignette_grain_filter()
+            filter_parts.append(
+                f"[{last_label}]{vg}[textured]"
+            )
+            last_label = "textured"
             
             # 자막 합성
             filter_parts.append(
@@ -451,8 +494,14 @@ class VideoComposer:
             f"color=black@{self.bg_opacity}:t=fill[darkened]"
         )
         
+        # 미세 비네트 + 필름 그레인 (픽셀 지문 무작위화)
+        vg = self._get_vignette_grain_filter()
         filter_parts.append(
-            f"[darkened]ass='{sub_path_escaped}'[subbed]"
+            f"[darkened]{vg}[textured]"
+        )
+        
+        filter_parts.append(
+            f"[textured]ass='{sub_path_escaped}'[subbed]"
         )
         
         filter_complex = ';'.join(filter_parts)
