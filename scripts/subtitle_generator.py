@@ -95,9 +95,8 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
             display_text = '\\N'.join(lines)
             start_str = self._format_time(0.0)
             end_str = self._format_time(0.3)
-            # Hook 스타일 적용 + 페이드인 + 미세 확대 + 반짝 효과 (ASS 내장 태그, 무료)
-            hook_effect = "{\\fad(60,0)\\fscx115\\fscy115\\t(0,180,\\fscx100\\fscy100)}"
-            events += f"Dialogue: 0,{start_str},{end_str},Hook,,0,0,0,,{hook_effect}{display_text}\n"
+            # 썸네일 후킹 자막은 썸네일 문구 재표시이므로 연출(효과) 없이 평문 유지
+            events += f"Dialogue: 0,{start_str},{end_str},Hook,,0,0,0,,{display_text}\n"
         
         for i, seg in enumerate(timed_segments):
             text = seg.get('text', '')
@@ -117,16 +116,19 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
             lines = split_text_for_subtitle(text, language, max_chars)
             display_text = '\\N'.join(lines)
             
-            # 첫 세그먼트는 Highlight
-            style = "Highlight" if i == 0 else "Default"
+            # 첫 세그먼트는 실제 후킹 문장 → Highlight 스타일 + 페이드인 + 미세 확대 + 반짝 효과
+            if i == 0:
+                style = "Highlight"
+                hook_effect = "{\\fad(60,0)\\fscx115\\fscy115\\t(0,180,\\fscx100\\fscy100)}"
+                effect = hook_effect
+            else:
+                style = "Default"
+                effect = "{\\fad(150,100)}"
             
             start_str = self._format_time(start)
             end_str = self._format_time(end)
             
-            # 페이드 효과
-            fade = "{\\fad(150,100)}"
-            
-            events += f"Dialogue: 0,{start_str},{end_str},{style},,0,0,0,,{fade}{display_text}\n"
+            events += f"Dialogue: 0,{start_str},{end_str},{style},,0,0,0,,{effect}{display_text}\n"
         
         return events
     
