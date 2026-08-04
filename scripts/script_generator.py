@@ -892,6 +892,12 @@ SNS 캡션 규칙:
         comment_cta = data.get('comment_cta', '').strip()
         data['comment_cta'] = comment_cta
         logger.info(f"  댓글 CTA: {'사용' if comment_cta else '없음'}")
+        
+        # 참여/구독 CTA 보장: 모델이 생성한 cta가 full_script에 없으면 이어붙임
+        cta = data.get('cta', '').strip()
+        if cta and cta not in data['full_script']:
+            data['full_script'] = data['full_script'].rstrip() + ' ' + cta
+            logger.info(f"  CTA 이어붙임: {cta[:30]}...")
         logger.info(f"  최종 full_script: {data['full_script'][-60:]}")
 
         # ─── ★ SNS 캡션 + 해시태그 정규화 (v6.3) ───
