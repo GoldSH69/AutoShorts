@@ -44,10 +44,13 @@ class TelegramNotifier:
         emoji = self.config.get_category_emoji(weekday)
         category_name = self.config.get_category_name(weekday, language)
         title = script_data.get('title', '제목 없음') if script_data else '제목 없음'
+        # 개행 등 공백 정규화 (메시지 포맷 보호: \n이 제목/후킹에 섞이지 않도록)
+        title = ' '.join(str(title).split())
         
         # 순차 정보 및 썸네일 훅 추출
         no = script_data.get('no', 1) if script_data else 1
         thumbnail_hook = script_data.get('thumbnail_hook', '설정 없음') if script_data else '설정 없음'
+        thumbnail_hook = ' '.join(str(thumbnail_hook).split())
         
         # 남은 주제 개수 계산 및 경고 추가
         remaining = 30 - no
@@ -232,6 +235,11 @@ class TelegramNotifier:
             
             if file_size > 50:
                 logger.warning(f"영상 크기 초과 ({file_size:.1f}MB > 50MB), 파일 전송 건너뜀")
+                self._send_message(
+                    f"⚠️ 영상 첨부 생략 안내\n"
+                    f"영상이 {file_size:.1f}MB로 텔레그램 50MB 제한을 초과해 파일을 첨부하지 못했습니다.\n"
+                    f"🔗 위의 YouTube 링크 또는 GitHub Actions Artifacts에서 확인해 주세요."
+                )
                 return False
             
             url = f"{self.base_url}/sendVideo"

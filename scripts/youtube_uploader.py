@@ -296,6 +296,8 @@ def generate_upload_metadata(script_data, config, language='ko', weekday=None):
     category_name = config.get_category_name(weekday, language)
     
     title_raw = script_data.get('title', '뇌를 깨우는 30초')
+    # 개행 등 공백 정규화 (업로드 제목에 \n이 새어 들어가지 않도록)
+    title_raw = ' '.join(str(title_raw).split())
     
     # ─── 제목 (hook 키워드를 앞에 배치하는 SEO 전략) ───
     # 썸네일 후킹 문구에서 검색어로 쓰기 좋은 핵심 키워드 추출
@@ -319,6 +321,7 @@ def generate_upload_metadata(script_data, config, language='ko', weekday=None):
     
     # ─── 설명 ───
     desc_body = script_data.get('description', '')
+    desc_body = ' '.join(str(desc_body).split())
     hook = script_data.get('hook', '')
     
     # 새로운 주제에 맞는 제미나이 생성 동적 해시태그 파싱 (instagram_hashtags 사용)

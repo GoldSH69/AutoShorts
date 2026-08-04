@@ -786,6 +786,9 @@ SNS 캡션 규칙:
             return False
         
         title = data.get('title', '')
+        # 개행 등 공백 정규화 (제목에 \n이 포함되지 않도록)
+        title = ' '.join(str(title).split())
+        data['title'] = title
         if not title or len(title) < 2:
             logger.warning(f"검증 실패: title 없음")
             return False
@@ -821,6 +824,8 @@ SNS 캡션 규칙:
             data['cta'] = '구독과 좋아요 부탁드려요!'
         if not data.get('description'):
             data['description'] = title
+        else:
+            data['description'] = ' '.join(str(data['description']).split())
         
         # ─── 검색 키워드 (다중) ───
         if not data.get('search_keywords'):

@@ -28,9 +28,7 @@ XFADE_TRANSITIONS = [
     'hlslice', 'hrslice', 'vuslice', 'vdslice',
 ]
 
-# 비네트/그레인 강도 범위 (눈에 거슬리지 않는 미세 수준)
-VIGNETTE_STRENGTH_RANGE = (0.15, 0.35)
-GRAIN_STRENGTH_RANGE = (12, 28)
+# 비네트 미세 음영 (정적 효과, 파일 크기 영향 없음)
 
 class VideoComposer:
     """FFmpeg 영상 합성기 v3.2 - fps 통일 + 다중 배경 전환"""
@@ -61,15 +59,10 @@ class VideoComposer:
             return 'fade'
         return random.choice(XFADE_TRANSITIONS)
     
-    def _get_vignette_grain_filter(self):
-        """미세 비네트 + 필름 그레인 노이즈 필터 문자열 (검열 회피용 픽셀 지문 무작위화)"""
-        # 비네트 (화면 테두리 미세 음영, 균일-가우시안 무작위)
-        v_strength = random.uniform(*VIGNETTE_STRENGTH_RANGE)
-        vignette_filter = f"vignette=angle=PI/5:mode=forward:aspect={self.width}/{self.height}:dither=no"
-        # 그레인 노이즈 (움직이는 미세 입자)
-        g_strength = random.uniform(*GRAIN_STRENGTH_RANGE)
-        noise_filter = f"noise=alls={g_strength:.0f}:allf=t+u"
-        return f"{vignette_filter},{noise_filter}"
+    def _get_vignette_filter(self):
+        """미세 비네트 필터 문자열 (화면 테두리 미세 음영, 정적)"""
+        # 그레인 노이즈 제거: v6.6의 noise 필터가 파일 크기를 130MB까지 폭증시켜 제거
+        return f"vignette=angle=PI/5:mode=forward:aspect={self.width}/{self.height}:dither=no"
     
     def _get_random_effects_filter(self, duration):
         """임의의 색감 보정 및 Ken Burns(랜덤 줌인/줌아웃) 필터 문자열 생성"""
@@ -285,6 +278,7 @@ class VideoComposer:
                     output_path, target_duration
                 )
                 if result:
+                    self._log_output_size(output_path)
                     self._cleanup([mixed_audio_path])
                     return result
             except Exception as e:
@@ -298,8 +292,19 @@ class VideoComposer:
             output_path, target_duration
         )
         
+        self._log_output_size(output_path)
         self._cleanup([mixed_audio_path])
         return result
+    
+    def _log_output_size(self, output_path):
+        """출력 영상 크기 검사 (20MB 초과 시 경고)"""
+        try:
+            size_mb = Path(output_path).stat().st_size / (1024 * 1024)
+            logger.info(f"  최종 영상 크기: {size_mb:.1f}MB")
+            if size_mb > 20:
+                logger.warning(f"  ⚠️ 영상 크기 20MB 초과: {size_mb:.1f}MB (목표 ≤20MB)")
+        except Exception as e:
+            logger.warning(f"  크기 확인 실패: {e}")
     
     def _compose_multi(self, background_paths, audio_path, subtitle_path,
                         output_path, target_duration):
@@ -404,8 +409,8 @@ class VideoComposer:
             else:
                 last_label = "v0"
             
-            # 미세 비네트 + 필름 그레인 (픽셀 지문 무작위화)
-            vg = self._get_vignette_grain_filter()
+            # 미세 비네트 (파일 크기 영향 없음)
+            vg = self._get_vignette_filter()
             filter_parts.append(
                 f"[{last_label}]{vg}[textured]"
             )
@@ -426,7 +431,9 @@ class VideoComposer:
                 '-r', str(self.fps),
                 '-c:v', 'libx264',
                 '-preset', 'fast',
-                '-crf', '23',
+                '-crf', '24',
+                '-maxrate', '3M',
+                '-bufsize', '6M',
                 '-pix_fmt', 'yuv420p',
                 '-c:a', 'aac',
                 '-b:a', '128k',
@@ -494,8 +501,8 @@ class VideoComposer:
             f"color=black@{self.bg_opacity}:t=fill[darkened]"
         )
         
-        # 미세 비네트 + 필름 그레인 (픽셀 지문 무작위화)
-        vg = self._get_vignette_grain_filter()
+        # 미세 비네트 (파일 크기 영향 없음)
+        vg = self._get_vignette_filter()
         filter_parts.append(
             f"[darkened]{vg}[textured]"
         )
@@ -514,7 +521,9 @@ class VideoComposer:
             '-r', str(self.fps),
             '-c:v', 'libx264',
             '-preset', 'fast',
-            '-crf', '23',
+            '-crf', '24',
+            '-maxrate', '3M',
+            '-bufsize', '6M',
             '-pix_fmt', 'yuv420p',
             '-c:a', 'aac',
             '-b:a', '128k',
