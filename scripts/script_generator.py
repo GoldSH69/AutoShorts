@@ -778,6 +778,33 @@ SNS 캡션 규칙:
         
         return hook
     
+    def _has_dangling_ending(self, text):
+        """
+        스크립트가 매달린 접속사/불완결 어미로 끝나는지 검사
+        - '왜냐하면', '그래서', '그런데', '하지만' 등 접속사로 끝나면 불완결
+        - '~며', '~니까', '~면' 같은 이어지는 어미로 끝나면 불완결
+        """
+        if not text:
+            return False
+        end = text.strip()
+
+        dangling_connectors = (
+            '왜냐하면', '그래서', '그런데', '하지만', '그렇다면',
+            '따라서', '결국', '즉', '그리고', '그러나', '때문에',
+            '덕분에', '이라서', '니까', '라서',
+        )
+        if any(end.endswith(c) for c in dangling_connectors):
+            return True
+
+        incomplete_endings = (
+            '하며', '하면서', '면서', '니까요', '는데요',
+            '면 좋겠', '이니까', '으니까',
+        )
+        if any(end.endswith(c) for c in incomplete_endings):
+            return True
+
+        return False
+
     def _validate_script(self, data):
         """스크립트 검증 (v6.3 - 캡션 해시태그 완전 제거)"""
         if not isinstance(data, dict):
@@ -814,6 +841,11 @@ SNS 캡션 규칙:
         script_len = len(data['full_script'])
         if script_len > SCRIPT_MAX_CHARS + 100:
             logger.warning(f"  ❌ 스크립트 심한 초과: {script_len}자 (기준: {SCRIPT_MAX_CHARS}자, +100자 이상)")
+            return False
+
+        # ─── 매달린 접속사/불완결 마무리 거부 (재생성 유도) ───
+        if self._has_dangling_ending(data['full_script']):
+            logger.warning(f"  ❌ 스크립트가 접속사/불완결로 마무리됨: ...{data['full_script'][-40:]}")
             return False
 
         # 기본값 채우기
