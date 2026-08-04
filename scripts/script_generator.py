@@ -615,14 +615,13 @@ SNS 캡션 규칙:
         prompt = prompt.replace('{min_chars}', str(SCRIPT_MIN_CHARS))
         prompt = prompt.replace('{max_chars}', str(SCRIPT_MAX_CHARS))
         
-        # 댓글 공유 요청 문구를 주제에 맞게 동적으로 생성하기 위한 지침 주입
+        # 댓글 공유 요청 문구를 주제에 맞게 생성하기 위한 지침 주입
         comment_instruction = (
-            "\n\n## 추가 필수 규칙:\n"
-            "6. 이번 주제와 내용에 자연스럽게 부합하며, 시청자의 댓글 참여(경험 공유)를 자연스럽게 유도하는 '댓글 공유 요청 문장'을 반드시 1문장 생성하세요.\n"
+            "\n\n## 추가 규칙:\n"
+            "6. 이번 주제와 내용에 자연스럽게 부합하며, 시청자의 댓글 참여(경험 공유)를 자연스럽게 유도하는 '댓글 공유 요청 문장'을 1문장 생성해서 \"comment_cta\" 필드에 담아주세요.\n"
             "   - 예: '여러분도 돈을 모으기 위해 충동구매를 참아보셨나요? 댓글로 경험을 공유해주세요!'\n"
             "   - 예: '가장 끊기 힘든 대인관계 유형은 무엇이었나요? 댓글로 남겨주세요!'\n"
-            "   - 출력 JSON의 \"comment_cta\" 필드에 이 문장을 단독으로 담아주세요.\n"
-            "   - 또한, \"full_script\"의 가장 마지막에 이 comment_cta 문장을 자연스럽게 덧붙여서 전체 나레이션 대본이 완결되도록 작성해 주세요. (즉, full_script = hook + body + cta + comment_cta 형태가 되어야 하며, 마지막에 반드시 이 댓글 공유 요청이 들려야 합니다.)"
+            "   ⚠️ 중요: comment_cta는 나레이션에서 무조건 맨 끝에 붙이지 마세요. full_script는 hook+body+cta가 자연스럽게 이어져 결론으로 완결되어야 합니다. 댓글 유도는 결말이 어색하지 않게 cta안에 자연스럽게 녹아들면 넣어도 되고, 굳이 넣지 않아도 됩니다. 끝났다 말고 갑자기 댓글 요청이 튀어나와 끊긴 것처럼 보이지 않게 해 주세요."
         )
         
         old_json_part = '"cta": "마무리 CTA 1문장 (실용적 행동 유도)",'
@@ -787,7 +786,9 @@ SNS 캡션 규칙:
         
         title = data.get('title', '')
         # 개행 등 공백 정규화 (제목에 \n이 포함되지 않도록)
-        title = ' '.join(str(title).split())
+        # 실제 줄바꿈 + 리터럴 '\n' 문자열 모두 공백으로 치환 후 정규화
+        title = str(title).replace('\\n', ' ').replace('\n', ' ')
+        title = ' '.join(title.split())
         data['title'] = title
         if not title or len(title) < 2:
             logger.warning(f"검증 실패: title 없음")
@@ -825,7 +826,8 @@ SNS 캡션 규칙:
         if not data.get('description'):
             data['description'] = title
         else:
-            data['description'] = ' '.join(str(data['description']).split())
+            data['description'] = str(data['description']).replace('\\n', ' ').replace('\n', ' ')
+            data['description'] = ' '.join(data['description'].split())
         
         # ─── 검색 키워드 (다중) ───
         if not data.get('search_keywords'):
@@ -854,14 +856,11 @@ SNS 캡션 규칙:
         
         data['search_keyword'] = data['search_keywords'][0]
         
-        # ─── ★ 나레이션 + 자막에 동적 댓글 CTA append ───
+        # ─── 댓글 CTA 강제 append 제거 (자연스러운 결말 보장) ───
         comment_cta = data.get('comment_cta', '').strip()
-        if not comment_cta:
-            comment_cta = '당신의 경험을 댓글로 공유해 주세요!'
-            data['comment_cta'] = comment_cta
-            
-        if comment_cta not in data['full_script']:
-            data['full_script'] = data['full_script'].rstrip() + ' ' + comment_cta
+        data['comment_cta'] = comment_cta
+        logger.info(f"  댓글 CTA: {'사용' if comment_cta else '없음'}")
+        logger.info(f"  최종 full_script: {data['full_script'][-60:]}")
 
         # ─── ★ SNS 캡션 + 해시태그 정규화 (v6.3) ───
         data = self._normalize_sns_captions(data)
