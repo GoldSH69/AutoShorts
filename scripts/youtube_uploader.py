@@ -297,22 +297,11 @@ def generate_upload_metadata(script_data, config, language='ko', weekday=None):
     
     title_raw = script_data.get('title', '뇌를 깨우는 30초')
     # 개행 등 공백 정규화 (업로드 제목에 \n이 새어 들어가지 않도록)
-    title_raw = ' '.join(str(title_raw).split())
+    title_raw = str(title_raw).replace('\\n', ' ').replace('\n', ' ')
+    title_raw = ' '.join(title_raw.split())
     
-    # ─── 제목 (hook 키워드를 앞에 배치하는 SEO 전략) ───
-    # 썸네일 후킹 문구에서 검색어로 쓰기 좋은 핵심 키워드 추출
-    hook = script_data.get('thumbnail_hook', '').strip()
-    hook_keyword = ''
-    if hook:
-        # 줄바꿈/공백 정리 후 첫 줄(임팩트 단어) 앞부분에서 최대 12자 추출
-        hook_flat = hook.replace('\n', ' ').strip()
-        hook_keyword = hook_flat[:12].strip(' ?!~.')
-    
+    # ─── 제목 (썸네일 후킹을 제목에 앞배치하지 않음) ───
     title = f"{emoji} {title_raw} | {channel_name}"
-    if hook_keyword:
-        candidate = f"{hook_keyword} | {title_raw}"
-        if len(candidate) <= 80:
-            title = f"{emoji} {candidate} | {channel_name}"
     
     if len(title) > 100:
         title = f"{emoji} {title_raw}"
