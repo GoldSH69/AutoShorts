@@ -615,17 +615,19 @@ SNS 캡션 규칙:
         prompt = prompt.replace('{min_chars}', str(SCRIPT_MIN_CHARS))
         prompt = prompt.replace('{max_chars}', str(SCRIPT_MAX_CHARS))
         
-        # 댓글 공유 요청 문구를 주제에 맞게 생성하기 위한 지침 주입
+        # 댓글/저장/참여 유도 CTA 문구를 주제에 맞춰 자연스럽게 생성하도록 프롬프트 지침 주입
         comment_instruction = (
-            "\n\n## 추가 규칙:\n"
-            "6. 이번 주제와 내용에 자연스럽게 부합하며, 시청자의 댓글 참여(경험 공유)를 자연스럽게 유도하는 '댓글 공유 요청 문장'을 1문장 생성해서 \"comment_cta\" 필드에 담아주세요.\n"
-            "   - 예: '여러분도 돈을 모으기 위해 충동구매를 참아보셨나요? 댓글로 경험을 공유해주세요!'\n"
-            "   - 예: '가장 끊기 힘든 대인관계 유형은 무엇이었나요? 댓글로 남겨주세요!'\n"
-            "   ⚠️ 중요: comment_cta는 나레이션에서 무조건 맨 끝에 붙이지 마세요. full_script는 hook+body+cta가 자연스럽게 이어져 결론으로 완결되어야 합니다. 댓글 유도는 결말이 어색하지 않게 cta안에 자연스럽게 녹아들면 넣어도 되고, 굳이 넣지 않아도 됩니다. 끝났다 말고 갑자기 댓글 요청이 튀어나와 끊긴 것처럼 보이지 않게 해 주세요."
+            "\n\n## 추가 규칙 (CTA 자연스러운 생성 필수):\n"
+            "6. full_script의 4단계(마무리)에는 주제 및 해결책의 내용에 자연스럽게 이어지는 시청자 댓글 참여 유도(경험/질문) 또는 저장/공유 멘트(CTA)가 반드시 1문장 포함되어야 합니다.\n"
+            "   - 예: '여러분은 어떤 유형인가요? 댓글로 공유해주세요!'\n"
+            "   - 예: '나중에 다시 찾아보려면 지금 저장해두세요!'\n"
+            "   - 예: '주변에 이런 습관이 있는 친구에게 공유해보세요!'\n"
+            "   - \"cta\" 및 \"comment_cta\" 필드에도 AI가 생성한 자연스러운 1문장의 CTA를 담아주세요.\n"
+            "   - ⚠️ 중요: 맨 끝에서 갑자기 뜬금없이 튀어나오는 문장이 아니라, 해결책 설명의 결론과 자연스럽게 매끄럽게 연결되도록 문맥을 이어주세요."
         )
         
         old_json_part = '"cta": "마무리 CTA 1문장 (실용적 행동 유도)",'
-        new_json_part = '"cta": "마무리 CTA 1문장 (실용적 행동 유도)",\n  "comment_cta": "주제에 자연스럽게 녹아드는 1문장의 댓글 공유 요청 멘트 (예: \'여러분은 ~해보셨나요? 댓글로 공유해주세요!\')", '
+        new_json_part = '"cta": "마무리 CTA 1문장 (주제와 자연스럽게 연결되는 댓글/저장/공유 유도 멘트)",\n  "comment_cta": "주제에 자연스럽게 녹아드는 1문장의 댓글/저장/공유 참여 요청 멘트 (예: \'여러분은 어느 유형인가요? 댓글로 남겨주세요!\')", '
         
         if old_json_part in prompt:
             prompt = prompt.replace(old_json_part, new_json_part)
@@ -888,17 +890,32 @@ SNS 캡션 규칙:
         
         data['search_keyword'] = data['search_keywords'][0]
         
-        # ─── 댓글 CTA 강제 append 제거 (자연스러운 결말 보장) ───
+        # ─── CTA (댓글/저장/공유 유도) 보장 및 대본 연동 ───
         comment_cta = data.get('comment_cta', '').strip()
-        data['comment_cta'] = comment_cta
-        logger.info(f"  댓글 CTA: {'사용' if comment_cta else '없음'}")
-        
-        # 참여/구독 CTA 보장: 모델이 생성한 cta가 full_script에 없으면 이어붙임
         cta = data.get('cta', '').strip()
-        if cta and cta not in data['full_script']:
-            data['full_script'] = data['full_script'].rstrip() + ' ' + cta
-            logger.info(f"  CTA 이어붙임: {cta[:30]}...")
-        logger.info(f"  최종 full_script: {data['full_script'][-60:]}")
+        
+        target_cta = cta or comment_cta
+        data['cta'] = cta if cta else target_cta
+        data['comment_cta'] = comment_cta if comment_cta else target_cta
+        
+        # full_script 마무리에 CTA가 잘 통합되어 있는지 검사
+        has_cta_in_script = False
+        if cta and cta in data['full_script']:
+            has_cta_in_script = True
+        elif comment_cta and comment_cta in data['full_script']:
+            has_cta_in_script = True
+        else:
+            cta_keywords = ('댓글', '공유', '저장', '남겨', '유형', '생각', '경험', '어느', '해보세요', '해보시길')
+            if any(kw in data['full_script'][-90:] for kw in cta_keywords):
+                has_cta_in_script = True
+        
+        # full_script에 CTA 문구가 누락되어 있으면 target_cta를 자연스럽게 결합
+        if not has_cta_in_script and target_cta:
+            data['full_script'] = data['full_script'].rstrip() + ' ' + target_cta
+            logger.info(f"  CTA 대본 반영 (이어붙임): {target_cta[:40]}...")
+        
+        logger.info(f"  댓글/참여 CTA: {data.get('cta', '없음')}")
+        logger.info(f"  최종 full_script: ...{data['full_script'][-60:]}")
 
         # ─── ★ SNS 캡션 + 해시태그 정규화 (v6.3) ───
         data = self._normalize_sns_captions(data)

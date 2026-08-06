@@ -4,6 +4,24 @@
 
 ---
 
+## 2026-08-06 — 자연스러운 AI CTA(댓글/저장/공유 유도) 생성 및 검증 강화
+
+> 원인 해결: 스크립트 작성 시 AI가 댓글 유도/저장 문구(CTA)를 생략하는 현상 개선
+
+### 승인 범위
+- 프롬프트 지침: `scripts/script_generator.py` 내 `comment_instruction` 지침 개편 (AI가 4단계 대본 마무리에 자연스러운 댓글/저장/공유 CTA 문구 1문장을 필수로 작성하도록 지정)
+- 대본 검증: `_validate_script()`에서 AI가 생성한 CTA가 `full_script` 마무리에 잘 녹아들어 있는지 확인하고, 누락 시 문맥 어색함 없이 덧붙임 보장.
+
+### 상세
+1. `scripts/script_generator.py`:
+   - `comment_instruction` 지침 수정: "굳이 넣지 않아도 됩니다" 문구 제거 및 자연스러운 CTA 작성 필수 안내.
+   - `_validate_script()`: `full_script` 마무리 키워드 검사 및 CTA 반영 보장 로직 강화.
+2. 검증:
+   - `python -m py_compile scripts/script_generator.py` 문법 통과.
+   - 오프라인 단위 테스트(Mock Data) 실행: AI 자연스러운 생성 포함 케이스 및 누락 시 자동 덧붙임 보장 케이스 모두 PASS.
+
+---
+
 ## 2026-08-03 — 영상 길이·대본 구조·토픽 전면 최적화 (v6.7)
 
 > 트렌드 리서치 기반: 완시청률 우선, 나레이션 38~50초가 최적, 4단계 공감 서사 구조.
