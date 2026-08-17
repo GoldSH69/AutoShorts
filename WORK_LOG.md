@@ -15,6 +15,9 @@
    - `config/topics.json`: 7개 카테고리 11~30번 토픽 140개를 손실회피/도파민디톡스/가스라이팅파훼/2인칭자기대입 등 2026 최신 숏폼 트렌드 토픽으로 전면 업그레이드 (1~10번 70개 발행 기록은 완벽 보존).
 3. **영상 용량 불변 보장 및 로드맵 현행화**:
    - `ROADMAP.md`: xfade 16종 전환, 정적 비네트 필터 완료 처리 및 `CRF 24 + maxrate 3M` 인코딩 기반 영상 파일 크기 20MB 이하 엄격 보장 원칙 반영.
+4. **배경 영상 차단 필터(BLOCKED_TERMS) 강화**:
+   - `scripts/video_downloader.py`: Pexels/Pixabay에서 부적절한 인물 및 임산부/만삭(`pregnant`, `pregnancy`, `maternity`, `baby bump`, `black female` 등) 스톡 영상이 다운로드되지 않도록 URL/태그 차단 키워드 리스트 전면 강화.
+   - `scripts/script_generator.py`: LLM 검색 키워드 생성 시 배제 지침 명시.
 
 ### 상세 내역 및 검증
 1. **지침 문서**:

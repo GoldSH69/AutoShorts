@@ -50,11 +50,14 @@ CATEGORY_KEYWORDS = {
     ],
 }
 
-# 차단 키워드 리스트 (동성 키스/스킨십, 제외 요청 요소 등)
+# 차단 키워드 리스트 (임산부/만삭, 동성 스킨십, 부적절한 인물 등 제외)
 BLOCKED_TERMS = [
     'gay', 'same sex', 'same-sex', 'lgbt', 'lgbtq',
     'men kissing', 'man kissing man', 'male kiss', 'two men',
-    'black woman', 'african woman'
+    'black woman', 'african woman', 'black female',
+    'pregnant', 'pregnancy', 'maternity', 'baby bump',
+    'pregnant woman', 'pregnant belly', 'expecting mother',
+    'childbirth', 'ultrasound', 'labor room',
 ]
 
 # 공통 백업 키워드 (모든 카테고리에서 사용 가능)
