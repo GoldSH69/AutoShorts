@@ -1,13 +1,16 @@
 # 프로젝트 작업 지침 (Project Rules)
 
-## 대화 시작 시 필독 문서 (Read before starting work)
-대화 및 작업을 시작하기 전에 **반드시 아래 문서를 먼저 읽고** 현재 진행 상황을 파악하십시오:
-- `WORK_LOG.md` — 최신 작업 기록 (가장 최근 항목부터 확인)
-- `implementation_plan.md` — 승인된 구현 계획 및 진행 범위
-- `INSTRUCTIONS.md` — 프로젝트 진행 지침
-- `ROADMAP.md` — 장기 로드맵
+## 대화 시작 시 필독 문서 및 필수 작업 (Read & Sync before starting work)
+- **대화 및 작업 시작 전 원격 최신화**: 작업 착수 전 반드시 `git fetch origin main && git pull --rebase origin main`을 실행하여 최신 커밋을 로컬에 반영하십시오.
+- **필독 문서 확인**: 아래 문서를 먼저 읽고 현재 진행 상황을 파악하십시오:
+  - `WORK_LOG.md` — 최신 작업 기록 (가장 최근 항목부터 확인)
+  - `implementation_plan.md` — 승인된 구현 계획 및 진행 범위
+  - `INSTRUCTIONS.md` — 프로젝트 진행 지침
+  - `ROADMAP.md` — 장기 로드맵
 
-새 작업(승인, 구현, 검증)이 끝날 때마다 `WORK_LOG.md`에 작업 내역을 갱신하십시오.
+## 커밋 및 푸시 전 필수 작업 (Before Commit & Push)
+- **프로젝트 문서 업데이트**: 작업이 완료되면 커밋/푸시 전 `WORK_LOG.md`(작업 내역), `ROADMAP.md` 등 프로젝트 관련 문서를 반드시 최신화하십시오.
+- **원격 상태 재확인**: CI 자동 커밋 충돌 방지를 위해 `git fetch` 및 `git pull --rebase origin main` 후 푸시하십시오.
 
 ## 코드 수정 및 승인 정책
 - **사용자가 명시적으로 코드 수정을 승인하기 전까지는 파일 내용을 직접 수정하지 마십시오.**

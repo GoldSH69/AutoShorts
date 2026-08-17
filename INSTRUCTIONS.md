@@ -4,13 +4,19 @@
 
 ## 핵심 지침 (Core Instructions)
 
-1. **소스 수정은 승인 후 진행 (Source modification only after approval)**
+1. **대화 및 작업 시작 전 원격 최신화 (Git Pull before work)**
+   - 작업 착수 전 반드시 `git fetch origin main && git pull --rebase origin main`을 실행하여 원격의 최신 커밋을 로컬에 반영합니다.
+
+2. **소스 수정은 승인 후 진행 (Source modification only after approval)**
    - 코드를 수정하기 전에 반드시 구현 계획(Implementation Plan)을 작성하고 사용자의 명시적인 승인을 받아야 합니다.
    - 승인되지 않은 소스 코드 수정은 허용되지 않습니다.
 
-2. **모든 기획이 확인 된 후 진행할 것 (Proceed after all plans/requirements are confirmed)**
+3. **모든 기획이 확인 된 후 진행할 것 (Proceed after all plans/requirements are confirmed)**
    - 기획 및 요구사항이 명확하게 확인되고 합의된 후에만 구현 및 수정 작업을 진행합니다.
    - 모호한 부분이 있을 경우 임의로 판단하지 않고 질문을 통해 확인합니다.
+
+4. **푸시 전 프로젝트 문서 최신화 (Update docs before push)**
+   - 작업 완료 후 커밋/푸시 전 `WORK_LOG.md`, `ROADMAP.md` 등 프로젝트 문서를 반드시 최신화합니다.
 
 ---
 
