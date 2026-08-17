@@ -5,7 +5,7 @@ ASS 자막 파일 생성 - v2 (음성 기반 싱크)
 
 import re
 from pathlib import Path
-from utils import logger, ensure_dir, split_text_for_subtitle
+from utils import logger, ensure_dir, split_text_for_subtitle, smart_split_korean_hook
 
 class SubtitleGenerator:
     """ASS 자막 생성기 v2 - 음성 기반 싱크"""
@@ -86,12 +86,14 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
         
         # ── 썸네일 후킹 자막 추가 (영상 맨 앞 0.0 ~ 0.3초) ──
         if thumbnail_hook:
-            # 썸네일 후킹 자막은 문맥 맞게 줄바꿈(\n)이 포함된 경우 개행 유지
-            if '\n' in thumbnail_hook:
-                lines = [line.strip() for line in thumbnail_hook.split('\n') if line.strip()]
+            # 썸네일 후킹 자막: 한국어 문맥 단락 맞춤 스마트 분할 적용
+            if language == 'ko':
+                lines = smart_split_korean_hook(thumbnail_hook, max_line_chars=9)
             else:
-                hook_max_chars = 9 if language == 'ko' else 15
-                lines = split_text_for_subtitle(thumbnail_hook, language, hook_max_chars)
+                if '\n' in thumbnail_hook:
+                    lines = [line.strip() for line in thumbnail_hook.split('\n') if line.strip()]
+                else:
+                    lines = split_text_for_subtitle(thumbnail_hook, language, 15)
             display_text = '\\N'.join(lines)
             start_str = self._format_time(0.0)
             end_str = self._format_time(0.3)

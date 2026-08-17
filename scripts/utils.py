@@ -97,6 +97,92 @@ def split_korean_text(text, max_chars=14):
     
     return lines
 
+def smart_split_korean_hook(text, max_line_chars=9):
+    """
+    한국어 썸네일/후킹 문구를 문맥과 단락(조사/어미/수식관계)에 맞게 최적의 2줄로 분할
+    """
+    if not text:
+        return []
+    
+    # 1. 이미 줄바꿈이 있는 경우 해당 줄바꿈 존중
+    if '\n' in text:
+        lines = [ln.strip() for ln in text.split('\n') if ln.strip()]
+        if lines:
+            return lines
+
+    text = text.strip()
+    words = text.split()
+    
+    # 단어가 1개거나 6자 이하의 아주 짧은 문구는 1줄 유지
+    if len(words) <= 1 or len(text) <= 6:
+        return [text]
+    
+    # 2단어 문구인 경우
+    if len(words) == 2:
+        if len(text) <= 7:
+            return [text]
+        return [words[0], words[1]]
+    
+    # 3단어 이상인 경우: 모든 분할 위치를 평가하여 문맥 최적 분할점 탐색
+    best_split_idx = 1
+    best_score = float('inf')
+    
+    # 조사 및 연결어미 패턴 (앞 줄 끝에 오면 좋은 패턴)
+    josa_ending = re.compile(r'(에서|으로|에게|까지|부터|보다|처럼|은|는|이|가|을|를|의|에|와|과|도|로|면|고|며|서|한|된|인)$')
+    # 관형사형 수식 어미 (뒤 명사를 수식: ~하는, ~되는, ~새는, ~모으는 등)
+    modifier_ending = re.compile(r'(하는|되는|있는|없는|보는|짜는|새는|깨는|모으는|버는|쓰는|남는|먹는|자는|타는|듣는|겪는|빠지는|멈추는|줄이는|넘는|쉬운)$')
+    
+    for i in range(1, len(words)):
+        left_words = words[:i]
+        right_words = words[i:]
+        
+        left_str = " ".join(left_words)
+        right_str = " ".join(right_words)
+        
+        len_l = len(left_str)
+        len_r = len(right_str)
+        
+        # 기본 점수: 두 줄의 글자수 차이 (길이 균형)
+        score = abs(len_l - len_r) * 1.2
+        
+        # 한 줄이 너무 길 경우 패널티
+        if len_l > max_line_chars:
+            score += (len_l - max_line_chars) * 4.0
+        if len_r > max_line_chars:
+            score += (len_r - max_line_chars) * 4.0
+            
+        # 한 줄에 2글자 이하의 짧은 단어 1개만 덜렁 남는 경우 강력한 패널티 (예: '... 파훼법', '... 이유')
+        if len(right_words) == 1 and len(right_words[0]) <= 2:
+            score += 15.0
+        if len(left_words) == 1 and len(left_words[0]) <= 2:
+            score += 15.0
+            
+        last_word_left = left_words[-1]
+        first_word_right = right_words[0]
+        
+        # 1. 앞 줄 끝이 조사나 연결어/수식어미로 끝나면 보너스
+        if josa_ending.search(last_word_left):
+            score -= 6.0
+        if modifier_ending.search(last_word_left):
+            score -= 8.0
+            
+        # 2. 뒷 줄 시작이 수량/단위(1초, 3분, 3가지, 43만원 등)로 시작하면 보너스
+        if re.match(r'^\d+(초|분|가지|원|만원|일|시간|개|배|%)', first_word_right):
+            score -= 5.0
+            
+        # 3. 4단어 2:2 대칭 분할 보너스
+        if len(words) == 4 and i == 2:
+            score -= 3.0
+            
+        if score < best_score:
+            best_score = score
+            best_split_idx = i
+            
+    line1 = " ".join(words[:best_split_idx])
+    line2 = " ".join(words[best_split_idx:])
+    
+    return [line1, line2]
+
 def split_english_text(text, max_chars=30):
     """영어 텍스트를 자막용으로 분할"""
     return split_korean_text(text, max_chars)

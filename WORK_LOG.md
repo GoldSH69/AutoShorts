@@ -10,7 +10,7 @@
 
 ### 승인 범위
 1. **지침 파일 3종 업데이트**:
-   - `AGENTS.md`, `.agents/AGENTS.md`, `INSTRUCTIONS.md`: "작업 전 Git Pull 동기화" 및 "푸시 전 프로젝트 문서(WORK_LOG/ROADMAP) 갱신" 명시.
+   - `AGENTS.md`, `.agents/AGENTS.md`, `INSTRUCTIONS.md`: "작업 전 Git Pull 동기화", "푸시 전 프로젝트 문서(WORK_LOG/ROADMAP) 갱신", "로컬 API 호출 테스트 절대 금지 (할당량/비용 보호)" 명시.
 2. **비발행분 140개 바이럴 토픽/후킹 전면 개편**:
    - `config/topics.json`: 7개 카테고리 11~30번 토픽 140개를 손실회피/도파민디톡스/가스라이팅파훼/2인칭자기대입 등 2026 최신 숏폼 트렌드 토픽으로 전면 업그레이드 (1~10번 70개 발행 기록은 완벽 보존).
 3. **영상 용량 불변 보장 및 로드맵 현행화**:
@@ -18,6 +18,8 @@
 4. **배경 영상 차단 필터(BLOCKED_TERMS) 강화**:
    - `scripts/video_downloader.py`: Pexels/Pixabay에서 부적절한 인물 및 임산부/만삭(`pregnant`, `pregnancy`, `maternity`, `baby bump`, `black female` 등) 스톡 영상이 다운로드되지 않도록 URL/태그 차단 키워드 리스트 전면 강화.
    - `scripts/script_generator.py`: LLM 검색 키워드 생성 시 배제 지침 명시.
+5. **0.3초 썸네일 후킹 자막 한국어 문맥 단락 맞춤 스마트 줄바꿈 알고리즘 적용**:
+   - `scripts/utils.py` & `scripts/subtitle_generator.py`: 조사/어미/수식관계/길이균형 기반 `smart_split_korean_hook` 구현 적용. 어색한 1글자 고립 없이 2줄 균형 배치 완성.
 
 ### 상세 내역 및 검증
 1. **지침 문서**:
