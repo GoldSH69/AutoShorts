@@ -229,7 +229,7 @@ class TelegramNotifier:
             return False
     
     def _send_video(self, video_path, caption=""):
-        """영상 파일 전송"""
+        """영상 파일 전송 (1회 재시도 포함)"""
         try:
             file_size = Path(video_path).stat().st_size / (1024 * 1024)
             
@@ -245,26 +245,48 @@ class TelegramNotifier:
             url = f"{self.base_url}/sendVideo"
             caption_text = f"🎬 {caption}"[:1024]
             
-            with open(video_path, 'rb') as video_file:
-                files = {'video': video_file}
-                data = {
-                    'chat_id': self.chat_id,
-                    'caption': caption_text,
-                    'supports_streaming': True,
-                }
+            max_attempts = 2  # 기본 1회 시도 + 재시도 1회
+            for attempt in range(1, max_attempts + 1):
+                try:
+                    logger.info(f"텔레그램 영상 전송 시도 ({attempt}/{max_attempts})...")
+                    with open(video_path, 'rb') as video_file:
+                        files = {'video': video_file}
+                        data = {
+                            'chat_id': self.chat_id,
+                            'caption': caption_text,
+                            'supports_streaming': True,
+                        }
+                        
+                        response = requests.post(url, data=data, files=files, timeout=120)
+                    
+                    if response.status_code == 200:
+                        logger.info("텔레그램 영상 전송 성공")
+                        return True
+                    else:
+                        logger.warning(f"텔레그램 영상 전송 실패 ({attempt}/{max_attempts}): HTTP {response.status_code} - {response.text[:200]}")
+                except requests.exceptions.RequestException as req_err:
+                    logger.warning(f"텔레그램 영상 전송 네트워크 오류 ({attempt}/{max_attempts}): {req_err}")
                 
-                response = requests.post(url, data=data, files=files, timeout=120)
+                if attempt < max_attempts:
+                    logger.info("3초 후 영상 전송을 1회 재시도합니다...")
+                    time.sleep(3)
             
-            if response.status_code == 200:
-                logger.info("텔레그램 영상 전송 성공")
-                return True
-            else:
-                logger.error(f"텔레그램 영상 전송 실패: {response.status_code}")
-                logger.error(response.text)
-                return False
+            # 2회 시도 모두 실패 시 사용자 안내 메시지 발송
+            logger.error("텔레그램 영상 전송 최종 실패 (재시도 포함)")
+            repo = os.environ.get('GITHUB_REPOSITORY', '')
+            run_id = os.environ.get('GITHUB_RUN_ID', '')
+            download_link = f"https://github.com/{repo}/actions/runs/{run_id}" if repo and run_id else "GitHub Actions Artifacts"
+            
+            self._send_message(
+                f"⚠️ 영상 파일 첨부 실패 안내\n\n"
+                f"텔레그램 서버 통신 지연(타임아웃)으로 영상 전송이 실패했습니다 (재시도 1회 완료).\n\n"
+                f"📱 핸드폰 다운로드 링크:\n{download_link}\n\n"
+                f"위 링크 하단 'Artifacts'에서 다운로드하시거나, Actions의 'Resend Video to Telegram' 워크플로를 수동 실행해 주세요."
+            )
+            return False
                 
         except Exception as e:
-            logger.error(f"텔레그램 영상 전송 오류: {e}")
+            logger.error(f"텔레그램 영상 전송 처리 중 예외 발생: {e}")
             return False
 
 
@@ -279,12 +301,16 @@ if __name__ == '__main__':
     parser.add_argument('--config', type=str, default=None)
     parser.add_argument('--error', type=str, default='')
     parser.add_argument('--language', type=str, default='ko')
+    parser.add_argument('--video-path', type=str, default=None)
+    parser.add_argument('--caption', type=str, default='')
     args = parser.parse_args()
     
     config = Config(args.config)
     notifier = TelegramNotifier(config)
     
-    if args.status == 'success':
+    if args.video_path:
+        notifier._send_video(args.video_path, args.caption or "재전송 영상")
+    elif args.status == 'success':
         notifier.send_custom(f"✅ GitHub Actions 작업 완료 ({get_today_str()})")
     else:
         notifier.send_failure(

@@ -1,0 +1,93 @@
+name: 📲 Resend Video to Telegram
+
+on:
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: 'Run ID (비워두면 대상 워크플로의 최근 런 자동 선택)'
+        required: false
+        default: ''
+      workflow:
+        description: '대상 워크플로 (Run ID 미입력 시 최근 런 탐색용)'
+        required: false
+        default: 'daily-short-ko.yml'
+        type: choice
+        options:
+          - 'daily-short-ko.yml'
+          - 'daily-short-en.yml'
+          - 'manual-trigger.yml'
+
+permissions:
+  contents: read
+  actions: read
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+  TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+  GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+jobs:
+  resend-video:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: 📥 Checkout
+        uses: actions/checkout@v4
+
+      - name: 🐍 Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: 📦 Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install requests PyYAML
+
+      - name: 🔍 Find and download video artifact
+        run: |
+          TARGET_RUN_ID="${{ github.event.inputs.run_id }}"
+          WORKFLOW_FILE="${{ github.event.inputs.workflow }}"
+          if [ -z "$WORKFLOW_FILE" ]; then
+            WORKFLOW_FILE="daily-short-ko.yml"
+          fi
+
+          if [ -z "$TARGET_RUN_ID" ]; then
+            echo "가장 최근 $WORKFLOW_FILE 런 탐색..."
+            TARGET_RUN_ID=$(gh run list --workflow="$WORKFLOW_FILE" --limit 1 --json databaseId --jq '.[0].databaseId')
+          fi
+          
+          if [ -z "$TARGET_RUN_ID" ]; then
+            echo "❌ 워크플로 실행 내역을 찾을 수 없습니다."
+            exit 1
+          fi
+          
+          echo "대상 Run ID: $TARGET_RUN_ID"
+          mkdir -p downloaded_artifact
+          cd downloaded_artifact
+          
+          gh run download "$TARGET_RUN_ID"
+          
+          echo "다운로드된 파일 목록:"
+          find . -type f
+          
+          VIDEO_FILE=$(find . -name "*.mp4" | head -n 1)
+          if [ -z "$VIDEO_FILE" ]; then
+            echo "❌ mp4 영상 파일을 찾을 수 없습니다."
+            exit 1
+          fi
+          
+          ABS_VIDEO_PATH=$(realpath "$VIDEO_FILE")
+          echo "선택된 영상 파일: $ABS_VIDEO_PATH"
+          echo "VIDEO_PATH=$ABS_VIDEO_PATH" >> $GITHUB_ENV
+          echo "TARGET_RUN_ID=$TARGET_RUN_ID" >> $GITHUB_ENV
+
+      - name: 📱 Resend video to Telegram
+        run: |
+          cd scripts
+          python telegram_notifier.py \
+            --config ../config/config.yml \
+            --video-path "$VIDEO_PATH" \
+            --caption "재전송 영상 (Run #$TARGET_RUN_ID)"
