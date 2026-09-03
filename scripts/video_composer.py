@@ -17,7 +17,7 @@ import shutil
 import tempfile
 from pathlib import Path
 from pydub import AudioSegment
-from utils import logger, ensure_dir
+from utils import logger, ensure_dir, get_project_root
 
 # xfade 전환 효과 목록 (검열 회피 + 동적 편집 패턴 다변화)
 XFADE_TRANSITIONS = [
@@ -37,6 +37,7 @@ class VideoComposer:
         self.config = config
         self.video_config = config.get_video_config()
         self.bgm_config = config.get_bgm_config()
+        self.sfx_config = config.get_sfx_config()
         
         self.width = self.video_config.get('width', 1080)
         self.height = self.video_config.get('height', 1920)
@@ -220,6 +221,25 @@ class VideoComposer:
         
         return normalized
     
+    def _calculate_transition_offsets(self, n, target_duration):
+        """다중 배경 xfade 전환 시점 오프셋(초) 계산"""
+        if n < 2:
+            return []
+        segment_duration = target_duration / n
+        fade = self.fade_duration
+        if n == 2:
+            return [max(0.1, segment_duration - fade)]
+        elif n == 3:
+            offset1 = max(0.1, segment_duration - fade)
+            offset2 = max(offset1 + 0.1, segment_duration * 2 - fade * 2)
+            return [offset1, offset2]
+        else:
+            offsets = [max(0.1, segment_duration - fade)]
+            for i in range(2, n):
+                accumulated = segment_duration * i - fade * (i - 1)
+                offsets.append(max(0.1, accumulated - fade))
+            return offsets
+
     # ─── 메인 합성 ───
     
     def compose(self, background_paths, narration_path, subtitle_path, 
@@ -266,9 +286,12 @@ class VideoComposer:
         logger.info(f"  나레이션: {narration_duration:.1f}초")
         logger.info(f"  목표 영상: {target_duration:.1f}초")
         
-        # 오디오 믹싱
+        # 전환 시점 오프셋 계산
+        transition_offsets = self._calculate_transition_offsets(len(valid_paths), target_duration)
+        
+        # 오디오 믹싱 (BGM + Whoosh 효과음)
         mixed_audio_path = str(Path(output_path).parent / "mixed_audio.mp3")
-        self._mix_audio(narration_path, bgm_path, mixed_audio_path, target_duration)
+        self._mix_audio(narration_path, bgm_path, mixed_audio_path, target_duration, transition_offsets=transition_offsets)
         
         # 다중 배경 합성
         if len(valid_paths) >= 2:
@@ -416,9 +439,10 @@ class VideoComposer:
             )
             last_label = "textured"
             
-            # 자막 합성
+            # 자막 합성 (assets/fonts 폴더 지정)
+            fonts_dir_escaped = str(get_project_root() / 'assets' / 'fonts').replace('\\', '/').replace(':', '\\:')
             filter_parts.append(
-                f"[{last_label}]ass='{sub_path_escaped}'[final]"
+                f"[{last_label}]ass='{sub_path_escaped}':fontsdir='{fonts_dir_escaped}'[final]"
             )
             
             filter_complex = ';'.join(filter_parts)
@@ -507,8 +531,9 @@ class VideoComposer:
             f"[darkened]{vg}[textured]"
         )
         
+        fonts_dir_escaped = str(get_project_root() / 'assets' / 'fonts').replace('\\', '/').replace(':', '\\:')
         filter_parts.append(
-            f"[textured]ass='{sub_path_escaped}'[subbed]"
+            f"[textured]ass='{sub_path_escaped}':fontsdir='{fonts_dir_escaped}'[subbed]"
         )
         
         filter_complex = ';'.join(filter_parts)
@@ -555,10 +580,12 @@ class VideoComposer:
     
     # ─── 오디오 믹싱 ───
     
-    def _mix_audio(self, narration_path, bgm_path, output_path, target_duration):
-        """오디오 믹싱 (나레이션 + BGM)"""
+    def _mix_audio(self, narration_path, bgm_path, output_path, target_duration, transition_offsets=None):
+        """오디오 믹싱 (나레이션 + BGM + SFX 효과음)"""
         
         narration = AudioSegment.from_file(narration_path)
+        mixed = narration
+        has_bgm = False
         
         if bgm_path and Path(bgm_path).exists() and self.bgm_config.get('enabled', True):
             try:
@@ -590,15 +617,38 @@ class VideoComposer:
                     bgm_padded = bgm + silence_pad
                     mixed = bgm_padded.overlay(narration)
                 
-                mixed.export(output_path, format='mp3', bitrate='192k')
-                logger.info(f"오디오 믹싱 완료 (BGM 포함, {len(mixed)/1000:.1f}초)")
-                return
-                
+                has_bgm = True
             except Exception as e:
                 logger.warning(f"BGM 믹싱 실패, 나레이션만 사용: {e}")
+                mixed = narration
         
-        narration.export(output_path, format='mp3', bitrate='192k')
-        logger.info(f"오디오 준비 완료 (나레이션만, {len(narration)/1000:.1f}초)")
+        # ─── SFX (화면 전환 Whoosh 효과음) 믹싱 ───
+        if self.sfx_config.get('enabled', True) and transition_offsets:
+            sfx_rel = self.sfx_config.get('file', 'assets/sfx/whoosh.wav')
+            sfx_path = get_project_root() / sfx_rel
+            if sfx_path.exists():
+                try:
+                    sfx = AudioSegment.from_file(str(sfx_path))
+                    sfx_vol = self.sfx_config.get('volume', 0.20)
+                    if sfx_vol > 0:
+                        sfx_db = 20 * math.log10(sfx_vol)
+                    else:
+                        sfx_db = -24
+                    sfx = sfx + sfx_db
+                    
+                    for offset in transition_offsets:
+                        offset_ms = int(offset * 1000)
+                        if offset_ms < len(mixed):
+                            mixed = mixed.overlay(sfx, position=offset_ms)
+                    logger.info(f"  🔊 SFX Whoosh 믹싱 완료 ({len(transition_offsets)}개 전환 지점)")
+                except Exception as e:
+                    logger.warning(f"  SFX 믹싱 실패: {e}")
+        
+        mixed.export(output_path, format='mp3', bitrate='192k')
+        if has_bgm:
+            logger.info(f"오디오 믹싱 완료 (BGM+SFX 포함, {len(mixed)/1000:.1f}초)")
+        else:
+            logger.info(f"오디오 준비 완료 (나레이션+SFX, {len(mixed)/1000:.1f}초)")
     
     # ─── 유틸리티 ───
     

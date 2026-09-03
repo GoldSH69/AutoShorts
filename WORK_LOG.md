@@ -4,6 +4,46 @@
 
 ---
 
+## 2026-09-03 — 영상 및 대본 퀄리티 전면 업그레이드 (v7.0)
+
+> 구현 계획: `implementation_plan.md` (사용자 승인 완료)
+> 목표: 시청자 클릭률(CTR)과 완시청률(AVD) 극대화 (트렌디한 비주얼 + 역동적 템포 + 효과음 디자인 + 최신 숏폼 트렌드 토픽 전면 리터칭)
+
+### 승인 범위 및 구현 내역
+1. **자막 비주얼 고도화 (`Pretendard` + 팝업 바운스 + 키워드 하이라이트)**
+   - `assets/fonts/Pretendard-Bold.ttf` 적용 및 `config.yml` 폰트명 반영.
+   - `scripts/video_composer.py`: FFmpeg `ass` 필터에 `:fontsdir` 옵션 지정으로 시스템 폰트 설치 여부와 무관하게 100% 로드 보장.
+   - `scripts/subtitle_generator.py`:
+     - 본문 자막 등장 시 통통 튀는 팝업 바운스 효과(`{\fad(100,80)\fscx108\fscy108\t(0,120,\fscx100\fscy100)}`) 적용.
+     - `_highlight_keywords()`: 숫자/통계 및 핵심 심리/뇌과학 용어(도파민, 전두엽, 가스라이팅, 회피형 등)를 네온 옐로우(`{\c&H0000FFFF&}`)로 자동 하이라이트.
+2. **배경 영상 템포 단축 (3개 → 4개 클립)**
+   - `config/config.yml` 및 `scripts/video_downloader.py`, `scripts/main.py`: `background.count`를 4개로 조정 (컷당 약 11초 템포로 역동성 확보).
+   - `download_multiple()`: 클립 수 부족 시 4개 목표 개수 보장 로직 강화.
+3. **화면 전환 효과음(Whoosh SFX) 자동 믹싱**
+   - `assets/sfx/whoosh.wav`: 0.4초 무손실 스위프 Whoosh 오디오 생성 및 배치.
+   - `scripts/config_loader.py` & `config/config.yml`: `sfx` 설정 섹션 추가 (`enabled: true`, `volume: 0.20`).
+   - `scripts/video_composer.py`: 4개 배경 전환 시점(`_calculate_transition_offsets`)마다 은은한 볼륨으로 Whoosh 사운드를 오디오 트랙에 자동 믹싱.
+4. **대본 프롬프트 7종 고도화**
+   - `config/prompts/*.txt` (7개 카테고리 전체):
+     - 2단계(공감): 두루뭉술한 설명 금지, '하이퍼 리얼리즘 공감 1문장(시간/장소/행동)' 필수 재현 지침.
+     - 3단계(원리/해결): 시청자가 오늘 당장 3초 만에 행동할 수 있는 'One-Action Rule(단 1가지 실천법)' 명령형 제시.
+     - 검색 키워드: 4단계 씬 흐름에 맞추어 4개의 영어 키워드 생성 지침 및 스키마 반영.
+   - `scripts/script_generator.py`: 기본 프롬프트 키워드 4개 반영.
+5. **비발행 토픽 전면 리터칭 & 트렌드 교체**
+   - `history/generated_topics.json` 기준 기발행된 토픽 100% 원본 보존 검증 완료.
+   - 비발행분의 비문, 오타("명애", "거리가 닫지 않는" 등), 문장잘림 전수 교정.
+   - `brain`의 15개 이상 중복되던 "집중력" 테마를 최신 숏폼 트렌드(팝콘브레인, 90분 커피, 글림프 뇌청소, 도파민 단식 등)로 다변화.
+   - 교과서식 밋밋한 썸네일 훅을 숏폼 3대 공식(손실회피, 역설, 숫자) 기반의 강력한 6~18자 훅으로 전면 업그레이드.
+
+### 검증 내역
+- `scripts/*.py` 10개 전체 파일 Python 컴파일 문법 검사 PASS.
+- `config/topics.json` 및 `config/config.yml` 파싱 및 유효성 전수 검사 PASS.
+- `topics.json` 210개 전체 항목 훅 길이(6~18자), 마침표 배제, 완결형 문장 검사 PASS.
+- 자막 ASS Pretendard 및 하이라이트/바운스 태그 생성 단위 테스트 PASS.
+- 오디오 믹싱 및 Whoosh SFX 오버레이 Pydub 단위 테스트 PASS.
+
+---
+
 ## 2026-08-30 — 텔레그램 영상 전송 1회 재시도(Retry), 실패 시 다운로드 링크 안내 및 모바일 재전송 워크플로 구축
 
 > 사용자 이슈 및 요청: 

@@ -174,7 +174,7 @@ tts:
 background:
   primary_source: "pexels"
   fallback_source: "pixabay"
-  count: 3
+  count: 4
   orientation: "portrait"
   min_duration: 10
   per_page: 15
@@ -191,10 +191,16 @@ bgm:
   fade_out_ms: 2000
   directory: "assets/music"
 
+# ─── SFX (효과음) ───
+sfx:
+  enabled: true
+  volume: 0.20
+  file: "assets/sfx/whoosh.wav"
+
 # ─── 자막 ───
 subtitle:
   enabled: true
-  font_name: "NanumGothic"
+  font_name: "Pretendard"
   font_size: 72
   font_color: "&H00FFFFFF"
   outline_color: "&H00000000"

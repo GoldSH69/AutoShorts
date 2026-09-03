@@ -141,10 +141,11 @@ class VideoDownloader:
             logger.error("배경 영상 다운로드 완전 실패!")
             raise Exception("배경 영상 다운로드 실패: 사용 가능한 영상 없음")
         
-        # 부족하면 기존 영상 복사해서 채우기
-        while len(downloaded) < 2:
-            downloaded.append(downloaded[0])
-            logger.info(f"  ♻️ 영상 부족, 첫 번째 영상 재사용")
+        # 부족하면 기존 영상 복사해서 목표 개수(count) 채우기
+        while len(downloaded) < count:
+            idx_to_dup = (count - len(downloaded) - 1) % len(downloaded)
+            downloaded.append(downloaded[idx_to_dup])
+            logger.info(f"  ♻️ 영상 부족, 기존 영상 재사용 ({len(downloaded)}/{count})")
         
         logger.info(f"배경 영상 다운로드 완료: {len(downloaded)}개")
         return downloaded

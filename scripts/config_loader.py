@@ -112,6 +112,10 @@ class Config:
     def get_bgm_config(self):
         return self.get('bgm', default={})
     
+    # ─── SFX ───
+    def get_sfx_config(self):
+        return self.get('sfx', default={})
+    
     # ─── 자막 ───
     def get_subtitle_config(self):
         return self.get('subtitle', default={})

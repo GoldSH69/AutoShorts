@@ -183,7 +183,7 @@ def main():
         
         downloader = VideoDownloader(config)
         
-        bg_count = config.get('background', 'count', default=3)
+        bg_count = config.get('background', 'count', default=4)
         
         try:
             background_paths = downloader.download_multiple(
