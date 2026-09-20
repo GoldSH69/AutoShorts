@@ -301,7 +301,15 @@ def generate_upload_metadata(script_data, config, language='ko', weekday=None):
     title_raw = ' '.join(title_raw.split())
     
     # ─── 제목 (썸네일 후킹을 제목에 앞배치하지 않음) ───
-    title = f"{emoji} {title_raw} | {channel_name}"
+    # U17 A-8: config title_format 사용. 파싱 실패 시 기존 하드코딩으로 폴백.
+    title_format = config.get(
+        'upload', 'youtube', 'title_format',
+        default="{emoji} {title} | {channel_name}")
+    try:
+        title = title_format.format(
+            emoji=emoji, title=title_raw, channel_name=channel_name)
+    except (KeyError, IndexError, ValueError):
+        title = f"{emoji} {title_raw} | {channel_name}"
     
     if len(title) > 100:
         title = f"{emoji} {title_raw}"
