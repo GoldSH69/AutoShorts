@@ -4,6 +4,15 @@
 
 ---
 
+## 2026-09-20 — U9 E-1 Analytics 수집 스켈레톤 완료
+
+- `update_history_video_id` 보충기록(가산 필드, 순번 무영향)+`main.py` 업로드 성공 시 호출+`scripts/analytics_collector.py` 신규(기본 드라이런, 실수집은 --collect).
+- 검증: select/merge/summarize/backfill 오프라인 통과, 드라이런(104건 중 video_id 0건→대상 0건) 정상. 외부 API 호출 없음.
+- 전제: 실수집에는 `yt-analytics.readonly` 범위 재동의 필요. U9 이전 발행분은 video_id가 없어 소급 수집 불가.
+- 다음: U10 C-4.
+
+---
+
 ## 2026-09-20 — U7 C-1 2단 CTA 완료
 
 - 프롬프트 7종 4단계+주입지침에 선택 질문+이유 한 줄 2단 구조 추가(1개 호흡, 2연타 금지 유지).

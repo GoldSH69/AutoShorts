@@ -217,6 +217,32 @@ SNS 캡션 규칙:
         history['last_updated'] = get_today_str()
         write_json(history_file, history)
         logger.info(f"히스토리 저장 (총 {len(history['topics'])}개, 번호: {topic_data.get('no', 1)})")
+
+    def update_history_video_id(self, category_id, no, video_id):
+        """E-1(U9): 업로드 성공 후 히스토리에 video_id를 보충 기록한다.
+
+        가산 필드라 순번 선택(_select_sequential_topic)·이전 주제 조회에 영향 없음.
+        생성 직후(당일) 기록 중 video_id가 비어 있는 가장 최근 건에만 기입한다.
+        """
+        if not video_id:
+            return False
+        history_config = self.config.get_history_config()
+        if not history_config.get('enabled', True):
+            return False
+        history_file = self.project_root / history_config.get('file', 'history/generated_topics.json')
+        history = self._load_history()
+        topics = history.get('topics', [])
+        for record in reversed(topics):
+            if (record.get('category') == category_id
+                    and str(record.get('no')) == str(no)
+                    and not record.get('video_id')):
+                record['video_id'] = video_id
+                history['last_updated'] = get_today_str()
+                write_json(history_file, history)
+                logger.info(f"히스토리 video_id 기록: [{category_id} no.{no}] {video_id}")
+                return True
+        logger.warning(f"히스토리 video_id 기록 대상 없음: [{category_id} no.{no}]")
+        return False
     
     def _get_previous_topics(self, category_id):
         history = self._load_history()

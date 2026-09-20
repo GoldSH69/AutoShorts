@@ -293,6 +293,13 @@ def main():
                         
                         if upload_result:
                             logger.info(f"  ✅ 업로드 성공: {upload_result['url']}")
+                            # U9 E-1: 성과 수집용 video_id를 히스토리에 보충 기록 (실패해도 무시)
+                            try:
+                                generator.update_history_video_id(
+                                    category_id, script_data.get('no'),
+                                    upload_result.get('video_id', ''))
+                            except Exception as e:
+                                logger.warning(f"  히스토리 video_id 기록 실패 (무시): {e}")
                         else:
                             logger.warning("  ⚠️ 업로드 실패 (영상은 생성됨)")
                     else:
