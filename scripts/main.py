@@ -210,12 +210,18 @@ def main():
         logger.info("-" * 40)
         
         sub_gen = SubtitleGenerator(config)
+        # U22 C-3: 저장 유도 요약 카드 (제목·CTA·훅 첫문장, CTA 없으면 생략)
+        _cta_line = (script_data.get('cta') or '').strip().split('\n')[0][:22]
+        _hook_line = (script_data.get('hook') or '').strip().split('\n')[0][:22]
+        _title_line = (script_data.get('title') or '').strip()[:22]
+        summary_lines = [_title_line, _cta_line, _hook_line] if _cta_line else None
         subtitle_path = sub_gen.generate(
             output_path=subtitle_path,
             language=language,
             total_duration=narration_duration,
             timed_segments=timed_segments,
             thumbnail_hook=script_data.get('thumbnail_hook', ''),
+            summary_lines=summary_lines,
         )
         
         # ─── Step 5: BGM 선택 ───

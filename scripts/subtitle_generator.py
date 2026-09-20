@@ -59,17 +59,19 @@ class SubtitleGenerator:
                     
         return highlighted
     
-    def generate(self, output_path, language='ko', 
-                 total_duration=30, timed_segments=None, thumbnail_hook=None):
+    def generate(self, output_path, language='ko',
+                 total_duration=30, timed_segments=None, thumbnail_hook=None,
+                 summary_lines=None):
         """
         ASS 자막 파일 생성 (TTS 실측 타이밍 기반)
-        
+
         Args:
             output_path: 출력 파일 경로 (.ass)
             language: 언어
             total_duration: 전체 영상 길이
             timed_segments: TTS 실측 타이밍 [{"text": "...", "start": 0.0, "end": 3.2}, ...]
-        
+            summary_lines: U22 C-3 요약 카드 3줄 [제목, CTA, 훅]. None이면 카드 생략.
+
         Returns:
             str: ASS 파일 경로
         """
@@ -101,6 +103,7 @@ Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour,
 Style: Default,{font_name},{font_size},{font_color},&H000000FF,{outline_color},&H80000000,-1,0,0,0,100,100,0,0,1,{outline_width},{shadow_offset},{alignment},50,50,{margin_v},1
 Style: Highlight,{font_name},{int(font_size*1.1)},&H0000D4FF,&H000000FF,{outline_color},&H80000000,-1,0,0,0,100,100,0,0,1,{int(outline_width+1)},{shadow_offset},{alignment},50,50,{margin_v},1
 Style: Hook,{font_name},{int(font_size*1.5)},&H0000FFFF,&H000000FF,&H00000000,&H80000000,-1,0,0,0,100,100,0,0,1,{int(outline_width*1.5)},{int(shadow_offset*1.5)},{alignment},50,50,{margin_v},1
+Style: Summary,{font_name},{int(font_size*0.65)},&H0000FFFF,&H000000FF,{outline_color},&H80000000,-1,0,0,0,100,100,0,0,1,{outline_width},{shadow_offset},{alignment},50,50,{margin_v},1
 
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
@@ -115,6 +118,15 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
         else:
             logger.error("❌ timed_segments가 없습니다! 자막 생성 불가")
             raise Exception("TTS timed_segments가 필요합니다")
+
+        # U22 C-3: 마지막 2.5초 요약 카드 (저장 유도). 짧은 영상·빈 입력이면 생략.
+        card_lines = [str(ln).strip() for ln in (summary_lines or []) if str(ln).strip()][:3]
+        if card_lines and total_duration >= 8:
+            card_start = self._format_time(max(0.3, total_duration - 2.5))
+            card_end = self._format_time(total_duration)
+            card_text = '\\N'.join(card_lines)
+            ass_content += f"Dialogue: 0,{card_start},{card_end},Summary,,0,0,0,,{card_text}\n"
+            logger.info(f"요약 카드 추가: {card_start}→{card_end} ({len(card_lines)}줄)")
         
         # 파일 저장
         with open(output_path, 'w', encoding='utf-8-sig') as f:
