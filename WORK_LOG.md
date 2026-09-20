@@ -4,6 +4,15 @@
 
 ---
 
+## 2026-09-20 — U2 A-2 `comment_cta` 단일원천+더블방지 완료
+
+- 프롬프트 7종 JSON 스키마에 `comment_cta` 직접 명시 + 역할 분리(`cta`=마지막 문장 복사 / `comment_cta`=고정댓글용, 덧붙임 금지).
+- `script_generator.py` 데드 런타임 패치 제거, 검증에 더블CTA 검출(재생성 유도)·참여전용 키워드 축소·패러프레이즈 채택 로직 적용.
+- 검증: `py_compile` + mock 5케이스 오프라인 통과. 외부 API 호출 없음.
+- 다음: U3 D-7.
+
+---
+
 ## 2026-09-20 — U1 A-1 `{min}`/`{max}` 치환 수정 완료
 
 - `scripts/script_generator.py` 프롬프트 치환부에 `{min}`/`{max}` 2줄 추가 (U1).

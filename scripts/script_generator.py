@@ -619,21 +619,21 @@ SNS 캡션 규칙:
         prompt = prompt.replace('{max}', str(SCRIPT_MAX_CHARS))
         
         # 댓글/저장/참여 유도 CTA 문구를 주제에 맞춰 자연스럽게 생성하도록 프롬프트 지침 주입
+        # U2 단일원천 규칙: 나레이션 CTA는 full_script 마지막 1문장만. cta 필드는 그 문장의 그대로 복사.
+        # comment_cta는 고정댓글/설명용 질문문으로 분리하며 full_script에 덧붙이지 않는다 (더블CTA 방지).
         comment_instruction = (
             "\n\n## 추가 규칙 (CTA 자연스러운 생성 필수):\n"
-            "6. full_script의 4단계(마무리)에는 주제 및 해결책의 내용에 자연스럽게 이어지는 시청자 댓글 참여 유도(경험/질문) 또는 저장/공유 멘트(CTA)가 반드시 1문장 포함되어야 합니다.\n"
+            "6. full_script의 4단계(마무리)에는 주제 및 해결책의 내용에 자연스럽게 이어지는 시청자 댓글 참여 유도(경험/질문) 또는 저장/공유 멘트(CTA)를 반드시 1문장만 포함하세요. 2문장 연속 CTA(예: 저장 요청+댓글 요청 붙이기)는 금지입니다.\n"
             "   - 예: '여러분은 어떤 유형인가요? 댓글로 공유해주세요!'\n"
             "   - 예: '나중에 다시 찾아보려면 지금 저장해두세요!'\n"
             "   - 예: '주변에 이런 습관이 있는 친구에게 공유해보세요!'\n"
-            "   - \"cta\" 및 \"comment_cta\" 필드에도 AI가 생성한 자연스러운 1문장의 CTA를 담아주세요.\n"
+            "   - \"cta\" 필드에는 full_script의 마지막 문장을 그대로 복사해서 담아주세요. (독립 생성 금지)\n"
+            "   - \"comment_cta\" 필드에는 고정댓글/설명용 질문 1문장을 담아주세요. 이 문장은 full_script에 덧붙이지 마세요.\n"
             "   - ⚠️ 중요: 맨 끝에서 갑자기 뜬금없이 튀어나오는 문장이 아니라, 해결책 설명의 결론과 자연스럽게 매끄럽게 연결되도록 문맥을 이어주세요."
         )
-        
-        old_json_part = '"cta": "마무리 CTA 1문장 (실용적 행동 유도)",'
-        new_json_part = '"cta": "마무리 CTA 1문장 (주제와 자연스럽게 연결되는 댓글/저장/공유 유도 멘트)",\n  "comment_cta": "주제에 자연스럽게 녹아드는 1문장의 댓글/저장/공유 참여 요청 멘트 (예: \'여러분은 어느 유형인가요? 댓글로 남겨주세요!\')", '
-        
-        if old_json_part in prompt:
-            prompt = prompt.replace(old_json_part, new_json_part)
+
+        # U2: 구형 런타임 패치 제거. 치환 대상 문자열이 현행 프롬프트 7종에 존재하지 않아
+        # 한 번도 실행되지 않은 데드코드였음(A-2). 스키마는 프롬프트 7종에 직접 명시하므로 여기서 패치하지 않는다.
             
         if "## 출력 형식" in prompt:
             prompt = prompt.replace("## 출력 형식", comment_instruction + "\n\n## 출력 형식")
@@ -893,14 +893,24 @@ SNS 캡션 규칙:
         
         data['search_keyword'] = data['search_keywords'][0]
         
-        # ─── CTA (댓글/저장/공유 유도) 보장 및 대본 연동 ───
+        # ─── CTA (댓글/저장/공유 유도) 보장 및 대본 연동 (U2 단일원천) ───
+        # 참여 전용 키워드로만 판정한다. 일반 서술어(생각/경험/어느/해보세요)는 제외 (A-7).
+        CTA_PARTICIPATION_KEYWORDS = ('댓글', '공유', '저장', '남겨')
         comment_cta = data.get('comment_cta', '').strip()
         cta = data.get('cta', '').strip()
-        
+
         target_cta = cta or comment_cta
         data['cta'] = cta if cta else target_cta
         data['comment_cta'] = comment_cta if comment_cta else target_cta
-        
+
+        # 더블CTA 검출: 끝 3토막 중 참여 키워드 포함 문장이 2개면 재생성 (U2).
+        # '?'로 질문+요청이 갈라지는 관용형(어느 유형인가요? 댓글로~)을 고려해 3토막을 본다.
+        tail_sentences = [s.strip() for s in re.split(r'[.!?\n]+', data['full_script']) if s.strip()][-3:]
+        cta_sentence_count = sum(1 for s in tail_sentences if any(kw in s for kw in CTA_PARTICIPATION_KEYWORDS))
+        if cta_sentence_count >= 2:
+            logger.warning(f"  ❌ 대본 끝에 CTA 2연타: ...{data['full_script'][-60:]}")
+            return False
+
         # full_script 마무리에 CTA가 잘 통합되어 있는지 검사
         has_cta_in_script = False
         if cta and cta in data['full_script']:
@@ -908,11 +918,14 @@ SNS 캡션 규칙:
         elif comment_cta and comment_cta in data['full_script']:
             has_cta_in_script = True
         else:
-            cta_keywords = ('댓글', '공유', '저장', '남겨', '유형', '생각', '경험', '어느', '해보세요', '해보시길')
-            if any(kw in data['full_script'][-90:] for kw in cta_keywords):
+            if any(kw in data['full_script'][-90:] for kw in CTA_PARTICIPATION_KEYWORDS):
+                # 패러프레이즈 CTA가 이미 있으면 덧붙이지 않고 나레이션을 진실로 삼는다 (더블 방지).
                 has_cta_in_script = True
-        
-        # full_script에 CTA 문구가 누락되어 있으면 target_cta를 자연스럽게 결합
+                last_sentence = tail_sentences[-1] if tail_sentences else ''
+                if last_sentence:
+                    data['cta'] = last_sentence
+
+        # full_script에 CTA 문구가 누락되어 있을 때만 target_cta를 결합 (단일 1문장)
         if not has_cta_in_script and target_cta:
             data['full_script'] = data['full_script'].rstrip() + ' ' + target_cta
             logger.info(f"  CTA 대본 반영 (이어붙임): {target_cta[:40]}...")
