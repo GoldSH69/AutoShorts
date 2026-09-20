@@ -336,7 +336,11 @@ def generate_upload_metadata(script_data, config, language='ko', weekday=None):
     # 기존 카테고리 고정 해시태그와 주제별 동적 해시태그 혼합
     combined_hashtags = f"{hashtags} {dynamic_hash_str}".strip()
     
-    description = f"""{hook}
+    # U21 C-5: hook 다음 줄에 comment_cta 질문 배치 (설명 2줄 참여 동선)
+    comment_seed = (script_data.get('comment_cta') or '').strip()
+    question_block = f"\n\n{comment_seed}" if comment_seed else ""
+
+    description = f"""{hook}{question_block}
 
 {desc_body}
 
