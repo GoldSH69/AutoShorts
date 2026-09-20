@@ -66,16 +66,17 @@ categories:
       - "romantic sunset couple"
   2:
     id: "brain"
-    name_ko: "뇌과학 기반 생산성 팁"
-    name_en: "Brain Science Productivity Tips"
+    # P3 통합 카테고리: 뇌·인지(축A) + 성장·성취 심리(축B) + 실행·습관 기법(축C)
+    name_ko: "뇌과학과 실행력의 심리학"
+    name_en: "Brain Science & Execution Psychology"
     emoji: "🧬"
-    hashtags_ko: "#뇌과학 #생산성 #집중력 #shorts #브레인 #생산성팁"
-    hashtags_en: "#neuroscience #productivity #braintips #shorts #focus"
+    hashtags_ko: "#뇌과학 #자기계발 #생산성 #shorts #실행력 #집중력"
+    hashtags_en: "#neuroscience #selfimprovement #productivity #shorts #mindset #focus"
     search_terms:
       - "brain neuroscience"
-      - "technology futuristic"
       - "focus concentration"
-      - "science laboratory"
+      - "person climbing stairs"
+      - "morning routine desk"
   3:
     id: "dark"
     name_ko: "다크 심리학 - 설득과 영향력"
