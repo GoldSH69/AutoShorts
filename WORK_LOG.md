@@ -4,6 +4,14 @@
 
 ---
 
+## 2026-09-20 — U29 11.3 요일 재배치 완료
+
+- 월relationship/화love/수brain/목dark/금dark/토love/일relationship. 기존 ID 재사용이라 히스토리 순번 리셋 없음.
+- money/success/hack은 휴면(히스토리 동결). dark 주2회 소진 감시 필요(P1 확장 전제). config 단독 변경이라 원복 가능.
+- 검증: 요일→ID 매핑 7일 전량 확인. 외부 API 호출 없음.
+
+---
+
 ## 2026-09-20 — U28 소재 생성 배치 스캐폴드 완료
 
 - `scripts/topic_generator.py` 신규: 필러 정의+경계규칙+전량 컨텍스트 조립+E-2 재검수+반영. 기본 드라이런.
