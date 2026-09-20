@@ -28,17 +28,23 @@ class SubtitleGenerator:
         """한 줄의 자막 텍스트 내 숫자 및 핵심 키워드를 노란색(&H0000FFFF)으로 강조"""
         if not line:
             return line
-        
+
+        # U18 A-9: 강조 복귀색을 font_color 설정값과 연동 (기본 흰색 폴백)
+        base_color = str(self.sub_config.get('font_color', '&H00FFFFFF')).replace('&H', '')
+        if not re.fullmatch(r'[0-9A-Fa-f]{8}', base_color):
+            base_color = '00FFFFFF'
+        close_tag = '{\\c&H' + base_color + '&}'
+
         count = 0
         max_highlights = 1  # 한 줄당 최대 1개 단어만 강조하여 시각적 피로도 방지
-        
+
         # 1. 숫자+단위 패턴 매칭 (예: 91%, 3초, 24시간, 43만원, 10배, 1가지 등)
         def repl_num(match):
             nonlocal count
             if count >= max_highlights:
                 return match.group(0)
             count += 1
-            return f"{{\\c&H0000FFFF&}}{match.group(0)}{{\\c&H00FFFFFF&}}"
+            return f"{{\\c&H0000FFFF&}}{match.group(0)}{close_tag}"
         
         # 2자 이상 숫자 또는 숫자+단위 (예: 91%, 30초, 2분 등)
         highlighted = re.sub(r'(\b\d+(?:%|초|분|시간|명|원|배|단계|가지|개|\b))', repl_num, line)
@@ -47,7 +53,7 @@ class SubtitleGenerator:
         if count < max_highlights:
             for kw in HIGHLIGHT_KEYWORDS:
                 if kw in highlighted and f"{{\\c&H0000FFFF&}}{kw}" not in highlighted:
-                    highlighted = highlighted.replace(kw, f"{{\\c&H0000FFFF&}}{kw}{{\\c&H00FFFFFF&}}", 1)
+                    highlighted = highlighted.replace(kw, f"{{\\c&H0000FFFF&}}{kw}{close_tag}", 1)
                     count += 1
                     break
                     

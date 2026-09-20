@@ -4,6 +4,14 @@
 
 ---
 
+## 2026-09-20 — U18 A-9 자막 복귀색 설정연동 완료
+
+- `_highlight_keywords` 복귀색을 font_color 설정값과 연동(기본 흰색·오류 폴백).
+- 검증: 기본출력 동일+색상변경+오류값 3케이스 통과. 외부 API 호출 없음.
+- 다음: U19 D-4.
+
+---
+
 ## 2026-09-20 — U17 A-8 title_format 배선 완료
 
 - `generate_upload_metadata`가 config title_format 사용, 파싱 실패 시 기존 하드코딩 폴백.
