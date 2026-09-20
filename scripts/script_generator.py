@@ -614,7 +614,7 @@ SNS 캡션 규칙:
         prompt = prompt.replace('{thumbnail_hook}', thumbnail_hook)
         prompt = prompt.replace('{min_chars}', str(SCRIPT_MIN_CHARS))
         prompt = prompt.replace('{max_chars}', str(SCRIPT_MAX_CHARS))
-        # A-1: 구형 플레이스홀더 {min}/{max}도 함께 치환 (긴 것 먼저 처리済이므로 안전)
+        # A-1: 구형 플레이스홀더 {min}/{max}도 함께 치환 (긴 것 먼저 치환하므로 안전)
         prompt = prompt.replace('{min}', str(SCRIPT_MIN_CHARS))
         prompt = prompt.replace('{max}', str(SCRIPT_MAX_CHARS))
         
