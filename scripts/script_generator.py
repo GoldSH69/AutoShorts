@@ -19,6 +19,14 @@ except ImportError:
     logger.error("google-generativeai 패키지를 설치하세요")
     raise
 
+try:
+    # U20 A-6: 검수 스크립트와 동일한 불용어 집합 사용
+    from topic_audit import STOPWORDS as DEDUP_STOPWORDS
+except ImportError:
+    DEDUP_STOPWORDS = frozenset({
+        "이유", "방법", "사람", "진짜", "심리", "것", "수", "오늘", "당신",
+    })
+
 
 # ─── 상수 ───
 # ─── 블로그 홍보 문구 ───
@@ -978,28 +986,44 @@ SNS 캡션 규칙:
 
     def _is_duplicate_title(self, result, category_id):
         """
-        🆕 v6.5 제목 중복 체크
-        - 최근 30개 제목과 핵심 키워드 비교
-        - 3개 이상 겹치면 중복으로 판단
+        제목 중복 체크 (U20 A-6 개선)
+        - 불용어 제외 실질 토큰 3개 이상 겹치면 중복 (기존 오탐 완화)
+        - 숫자 토큰(43만 등) 공유 + 실질 토큰 2개 이상이면 중복 (D-1형 과소탐 보완)
         """
         new_title = result.get('title', '').lower()
-        new_script = result.get('full_script', '').lower()
-        
+
         history = self._load_history()
         previous = history.get('topics', [])
         same_cat = [t for t in previous if t.get('category') == category_id]
         recent_titles = [t.get('title', '').lower() for t in same_cat[-30:]]
-        
-        # 새 제목의 핵심 단어 추출 (2글자 이상)
-        import re
-        new_words = set(w for w in re.findall(r'[가-힣a-z]{2,}', new_title))
-        
+
+        def content_tokens(text):
+            return {w for w in re.findall(r'[가-힣a-z]{2,}', text)} - DEDUP_STOPWORDS
+
+        def number_tokens(text):
+            # 단위 결합형(43만, 24시간, 3초) 또는 2자리 이상 bare 숫자. 한 자리 bare 숫자는 제외.
+            return set(re.findall(
+                r'\d+\s*(?:만|시간|초|분|일|주|월|년|%|배|가지|개|명|원|시)|\b\d{2,}\b',
+                text))
+
+        def flat(text):
+            return re.sub(r'\s+', '', text)
+
+        new_words = content_tokens(new_title)
+        new_nums = number_tokens(new_title)
+
         for old_title in recent_titles:
-            old_words = set(w for w in re.findall(r'[가-힣a-z]{2,}', old_title))
+            if flat(old_title) == flat(new_title):
+                logger.warning(f"  제목 완전일치: '{old_title}'")
+                return True
+            old_words = content_tokens(old_title)
             overlap = new_words & old_words
             if len(overlap) >= 3:
                 logger.warning(f"  제목 겹침: {overlap} (기존: '{old_title}')")
                 return True
-        
-        return False       
+            if (new_nums & number_tokens(old_title)) and len(overlap) >= 1:
+                logger.warning(f"  제목 겹침(숫자+토큰): {overlap} (기존: '{old_title}')")
+                return True
+
+        return False
     
