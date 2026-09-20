@@ -30,6 +30,8 @@ class YouTubeUploader:
     
     SCOPES = [
         'https://www.googleapis.com/auth/youtube.upload',
+        # U10 C-4: 첫 댓글 등록용. 기존 토큰은 재동의 필요 (실패 시 업로드에 영향 없음).
+        'https://www.googleapis.com/auth/youtube.force-ssl',
     ]
     
     RETRIABLE_STATUS_CODES = [500, 502, 503, 504]
@@ -282,6 +284,38 @@ class YouTubeUploader:
                 time.sleep(wait)
         
         return response
+
+    def post_seed_comment(self, video_id, text):
+        """C-4(U10): 첫 댓글(시드) 등록. comment_cta 질문을 첫 댓글로 남겨 논의를 연다.
+
+        주의: Data API v3에 고정(pin) 엔드포인트는 없으므로 고정은 Studio에서
+        수동 1탭. 실패해도 False만 반환하고 절대 예외를 던지지 않는다
+        (업로드 결과에 영향 없음). 기존 토큰은 force-ssl 재동의 전까지 403으로
+        실패하며, 이 경우 경고만 남긴다.
+        """
+        if not self.enabled or not getattr(self, 'youtube', None):
+            return False
+        text = (text or '').strip()
+        if not video_id or not text:
+            return False
+        try:
+            mine = self.youtube.channels().list(part='id', mine=True).execute()
+            items = (mine or {}).get('items', [])
+            if not items:
+                return False
+            self.youtube.commentThreads().insert(
+                part='snippet',
+                body={'snippet': {
+                    'channelId': items[0]['id'],
+                    'videoId': video_id,
+                    'topLevelComment': {'snippet': {'textOriginal': text[:1000]}},
+                }},
+            ).execute()
+            logger.info(f"  첫 댓글 등록 성공: {text[:40]}...")
+            return True
+        except Exception as e:
+            logger.warning(f"  첫 댓글 등록 실패 (무시, 토큰 재동의 필요 가능): {e}")
+            return False
 
 
 # ─── 메타데이터 생성 함수 ───

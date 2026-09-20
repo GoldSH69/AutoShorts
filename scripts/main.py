@@ -300,6 +300,13 @@ def main():
                                     upload_result.get('video_id', ''))
                             except Exception as e:
                                 logger.warning(f"  히스토리 video_id 기록 실패 (무시): {e}")
+                            # U10 C-4: 첫 댓글 시드 등록 (실패해도 무시, 고정은 Studio 수동)
+                            try:
+                                uploader.post_seed_comment(
+                                    upload_result.get('video_id', ''),
+                                    script_data.get('comment_cta', ''))
+                            except Exception as e:
+                                logger.warning(f"  첫 댓글 등록 실패 (무시): {e}")
                         else:
                             logger.warning("  ⚠️ 업로드 실패 (영상은 생성됨)")
                     else:

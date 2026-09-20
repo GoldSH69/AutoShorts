@@ -4,6 +4,14 @@
 
 ---
 
+## 2026-09-20 — U10 C-4 첫댓글 시드 등록 완료(고정은 수동)
+
+- `post_seed_comment` 실패무시+`main.py` 업로드 성공 시 호출+`youtube.force-ssl` 범위 추가(기존 토큰 재동의 필요).
+- 정정: Data API v3에 pin 엔드포인트가 없어 완전 자동 고정 불가. 첫 댓글 시드+Studio 수동 고정으로 구현.
+- 검증: mock 4케이스 오프라인 통과. 외부 API 호출 없음.
+
+---
+
 ## 2026-09-20 — U9 E-1 Analytics 수집 스켈레톤 완료
 
 - `update_history_video_id` 보충기록(가산 필드, 순번 무영향)+`main.py` 업로드 성공 시 호출+`scripts/analytics_collector.py` 신규(기본 드라이런, 실수집은 --collect).
