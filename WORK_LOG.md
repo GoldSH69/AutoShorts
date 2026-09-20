@@ -4,6 +4,14 @@
 
 ---
 
+## 2026-09-20 — U3 D-7 `relationship` 메타 교체 완료
+
+- `config.yml` relationship(일): hashtags_ko/en 대인관계 중심 교체, search_terms 로맨틱→직장/친구/대화.
+- 검증: Config 로더 오프라인 확인. 외부 API 호출 없음.
+- 다음: U4 D-5.
+
+---
+
 ## 2026-09-20 — U2 A-2 `comment_cta` 단일원천+더블방지 완료
 
 - 프롬프트 7종 JSON 스키마에 `comment_cta` 직접 명시 + 역할 분리(`cta`=마지막 문장 복사 / `comment_cta`=고정댓글용, 덧붙임 금지).
