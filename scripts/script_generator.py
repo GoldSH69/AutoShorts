@@ -304,6 +304,25 @@ SNS 캡션 규칙:
         logger.info(f"     썸네일 후킹: '{selected_hook}'")
 
         return selected_no, selected_topic, selected_hook
+
+    def _format_instruction(self, no):
+        """U23 C-2: 소재 번호 기반 포맷 지시문 (해결형/자기진단형/이분법형 순환).
+
+        CTA 단일문장(U2)·2단 구조(U7) 규칙과 양립하도록 CTA는 1개 호흡으로 둔다.
+        """
+        try:
+            slot = int(no) % 3
+        except (TypeError, ValueError):
+            slot = 0
+        if slot == 1:
+            return ("자기진단형: 본문에 3가지 체크 항목을 제시하고, 시청자가 해당 개수를 "
+                    "세며 끝까지 보게 하세요. CTA는 '당신은 몇 개 해당되나요? 개수를 "
+                    "댓글로 남겨주세요' 형식의 2단(선택+이유 한 줄)으로.")
+        if slot == 2:
+            return ("이분법 논쟁형: A형 vs B형 양자택일 구도로 서술하고, 댓글에서 편이 "
+                    "갈리게 하세요. CTA는 '당신은 A형인가요, B형인가요? 그렇게 생각한 "
+                    "이유도 한 줄로 남겨주세요' 형식의 2단으로.")
+        return ("해결형: 프롬프트의 4단계 구조대로 문제→원리→해결 서사로 작성하세요.")
         
     # ─── Gemini API 호출 ───
     
@@ -651,6 +670,8 @@ SNS 캡션 규칙:
         # A-1: 구형 플레이스홀더 {min}/{max}도 함께 치환 (긴 것 먼저 치환하므로 안전)
         prompt = prompt.replace('{min}', str(SCRIPT_MIN_CHARS))
         prompt = prompt.replace('{max}', str(SCRIPT_MAX_CHARS))
+        # U23 C-2: 소재 번호 기반 포맷 로테이션 (해결/진단/이분법 순환)
+        prompt = prompt.replace('{video_format}', self._format_instruction(selected_no))
         
         # 댓글/저장/참여 유도 CTA 문구를 주제에 맞춰 자연스럽게 생성하도록 프롬프트 지침 주입
         # U2 단일원천 규칙: 나레이션 CTA는 full_script 마지막 1문장만. cta 필드는 그 문장의 그대로 복사.

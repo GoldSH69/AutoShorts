@@ -43,6 +43,7 @@
 ## 이번 영상 주제 (반드시 준수)
 👉 주제: {forced_topic}
 👉 썸네일 훅 참고: {thumbnail_hook} (국한되지 말고 창작)
+👉 이번 영상 포맷: {video_format}
 
 ## 이전에 다룬 주제들 (중복 금지)
 {previous_topics}
