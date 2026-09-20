@@ -4,6 +4,14 @@
 
 ---
 
+## 2026-09-20 — U4 D-5 `money no.22` 법칙명 교체+금지항목 완료
+
+- `topics.json` money no.22: 켈소 법칙→충동구매 숙려 규칙. 프롬프트 7종 5항 금지에 출처 불명 법칙명 창작 금지 추가.
+- 검증: JSON 유효성+개수 유지(30)+7종 금지문구 확인. 외부 API 호출 없음.
+- 다음: U5 D-1.
+
+---
+
 ## 2026-09-20 — U3 D-7 `relationship` 메타 교체 완료
 
 - `config.yml` relationship(일): hashtags_ko/en 대인관계 중심 교체, search_terms 로맨틱→직장/친구/대화.
