@@ -113,6 +113,15 @@ class TelegramNotifier:
         # ② SNS 캡션 전송 (인스타/틱톡 각각 별도 메시지)
         if script_data:
             self._send_sns_captions(script_data, title)
+
+        # ②-2 첫 댓글용 문구 전송 (U11: 수동 등록용 복사용, pin API 미지원 대체)
+        if script_data:
+            comment_seed = (script_data.get('comment_cta') or '').strip()
+            if comment_seed:
+                self._send_message(
+                    f"💬 첫 댓글용 문구 (복사해서 사용):\n{comment_seed}",
+                    parse_mode=None)
+                logger.info("첫 댓글용 문구 전송 완료")
         
         # ③ 영상 파일 전송 (옵션)
         if (video_path and Path(video_path).exists() 
