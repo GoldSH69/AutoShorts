@@ -7,6 +7,12 @@ import re
 from pathlib import Path
 from utils import logger, ensure_dir, split_text_for_subtitle, smart_split_korean_hook
 
+# ── U22 C-3 요약 카드 타이밍 상수 ──
+SUMMARY_CARD_LEAD = 1.5      # 나레이션 종료 몇 초 전부터 카드를 띄울지
+SUMMARY_CARD_GAP = 0.05      # 나레이션 자막 종료 ~ 카드 시작 사이 간격
+SUMMARY_CARD_MIN_DUR = 1.2   # 카드 최소 노출 시간 (미달 시 카드 생략)
+LAST_SUB_MIN_VISIBLE = 0.5   # 마지막 나레이션 자막이 보장받는 최소 노출 시간
+
 # 하이라이트 대상 주요 심리/뇌과학/트렌드 키워드
 HIGHLIGHT_KEYWORDS = [
     '전두엽', '도파민', '코르티솔', '해마', '가스라이팅', '나르시시스트',
@@ -61,16 +67,18 @@ class SubtitleGenerator:
     
     def generate(self, output_path, language='ko',
                  total_duration=30, timed_segments=None, thumbnail_hook=None,
-                 summary_lines=None):
+                 summary_lines=None, video_duration=None):
         """
         ASS 자막 파일 생성 (TTS 실측 타이밍 기반)
 
         Args:
             output_path: 출력 파일 경로 (.ass)
             language: 언어
-            total_duration: 전체 영상 길이
+            total_duration: 나레이션 길이 (초)
             timed_segments: TTS 실측 타이밍 [{"text": "...", "start": 0.0, "end": 3.2}, ...]
             summary_lines: U22 C-3 요약 카드 3줄 [제목, CTA, 훅]. None이면 카드 생략.
+            video_duration: 최종 영상 길이 (초). 요약 카드 종료 시점으로 사용.
+                            None이면 total_duration을 사용한다.
 
         Returns:
             str: ASS 파일 경로
@@ -109,24 +117,47 @@ Style: Summary,{font_name},{int(font_size*0.65)},&H0000FFFF,&H000000FF,{outline_
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 """
         
-        # ── 타이밍 소스 결정 ──
-        if timed_segments and len(timed_segments) > 0:
-            logger.info(f"자막 타이밍: TTS 실측 기반 ({len(timed_segments)}개)")
-            ass_content += self._build_events_from_timed(
-                timed_segments, max_chars, language, thumbnail_hook
-            )
-        else:
+        if not timed_segments or len(timed_segments) == 0:
             logger.error("❌ timed_segments가 없습니다! 자막 생성 불가")
             raise Exception("TTS timed_segments가 필요합니다")
 
-        # U22 C-3: 마지막 2.5초 요약 카드 (저장 유도). 짧은 영상·빈 입력이면 생략.
+        # ── U22 C-3 요약 카드 구간 선계산 ──
+        # 카드 구간을 먼저 확정한 뒤 나레이션 자막을 그 직전에서 끊는다.
+        # (libass는 중앙 정렬(alignment 4~6) 이벤트에 충돌 회피를 적용하지 않아
+        #  같은 시간에 두 이벤트가 있으면 화면에서 그대로 포개진다)
         card_lines = [str(ln).strip() for ln in (summary_lines or []) if str(ln).strip()][:3]
-        if card_lines and total_duration >= 8:
-            card_start = self._format_time(max(0.3, total_duration - 2.5))
-            card_end = self._format_time(total_duration)
+        video_end = float(video_duration) if video_duration else float(total_duration)
+        # 나레이션이 영상 최대 길이를 넘는 예외 상황에서는 영상 끝을 기준으로 삼는다
+        narration_end = min(float(total_duration), video_end)
+
+        card_window = None
+        if card_lines and video_end >= 8:
+            card_window = self._plan_summary_card(timed_segments, narration_end, video_end)
+            if card_window is None:
+                logger.warning("요약 카드 생략: 나레이션 자막과 겹치지 않는 구간 확보 실패")
+
+        narration_cutoff = (card_window[0] - SUMMARY_CARD_GAP) if card_window else None
+
+        # ── 나레이션 자막 이벤트 ──
+        logger.info(f"자막 타이밍: TTS 실측 기반 ({len(timed_segments)}개)")
+        ass_content += self._build_events_from_timed(
+            timed_segments, max_chars, language, thumbnail_hook,
+            cutoff=narration_cutoff,
+        )
+
+        # ── 요약 카드 (저장 유도): 나레이션 종료 1.5초 전 ~ 영상 끝 ──
+        if card_window:
+            card_start_str = self._format_time(card_window[0])
+            card_end_str = self._format_time(card_window[1])
             card_text = '\\N'.join(card_lines)
-            ass_content += f"Dialogue: 0,{card_start},{card_end},Summary,,0,0,0,,{card_text}\n"
-            logger.info(f"요약 카드 추가: {card_start}→{card_end} ({len(card_lines)}줄)")
+            ass_content += (
+                f"Dialogue: 1,{card_start_str},{card_end_str},Summary,,0,0,0,,"
+                f"{{\\fad(200,0)}}{card_text}\n"
+            )
+            logger.info(
+                f"요약 카드 추가: {card_start_str}→{card_end_str} "
+                f"({card_window[1] - card_window[0]:.1f}초, {len(card_lines)}줄)"
+            )
         
         # 파일 저장
         with open(output_path, 'w', encoding='utf-8-sig') as f:
@@ -136,8 +167,40 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
         logger.info(f"자막 생성 완료: {output_path} ({seg_count}개 세그먼트, 폰트: {font_name})")
         return output_path
     
-    def _build_events_from_timed(self, timed_segments, max_chars, language, thumbnail_hook=None):
-        """TTS 실측 타이밍 기반 자막 이벤트 생성"""
+    def _plan_summary_card(self, timed_segments, narration_duration, video_end):
+        """
+        요약 카드 구간 계산 → (start, end) 또는 None
+
+        기준:
+          1. 기본 시작점은 나레이션 종료 SUMMARY_CARD_LEAD초 전 (영상 끝까지 = 약 3초 노출)
+          2. 마지막 나레이션 자막의 최소 노출(LAST_SUB_MIN_VISIBLE)을 침범하면 그만큼 뒤로 미룸
+          3. 그래도 카드 노출이 SUMMARY_CARD_MIN_DUR 미만이면 카드 생략
+        """
+        try:
+            last = timed_segments[-1]
+            last_start = max(float(last.get('start', 0.0)), 0.3)
+        except (IndexError, TypeError, ValueError):
+            last_start = 0.3
+
+        card_start = max(0.3, float(narration_duration) - SUMMARY_CARD_LEAD)
+
+        # 마지막 나레이션 자막이 최소 노출 시간을 확보하도록 시작점 보정
+        earliest = last_start + LAST_SUB_MIN_VISIBLE + SUMMARY_CARD_GAP
+        if card_start < earliest:
+            card_start = earliest
+
+        if card_start > video_end - SUMMARY_CARD_MIN_DUR:
+            return None
+
+        return (card_start, float(video_end))
+
+    def _build_events_from_timed(self, timed_segments, max_chars, language,
+                                 thumbnail_hook=None, cutoff=None):
+        """
+        TTS 실측 타이밍 기반 자막 이벤트 생성
+
+        cutoff: 나레이션 자막이 넘지 못하는 종료 시각(초). 요약 카드와의 겹침 방지용.
+        """
         events = ""
         
         # ── 썸네일 후킹 자막 추가 (영상 맨 앞 0.0 ~ 0.3초) ──
@@ -169,6 +232,10 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                 start = max(start, 0.3)
                 if end <= start:
                     end = start + 2.0
+
+            # 요약 카드 시작 직전에서 끊기 (중앙 정렬 이벤트 겹침 방지)
+            if cutoff is not None and start < cutoff and end > cutoff:
+                end = cutoff
             
             # 자막 줄바꿈
             lines = split_text_for_subtitle(text, language, max_chars)

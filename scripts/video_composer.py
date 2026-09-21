@@ -44,6 +44,8 @@ class VideoComposer:
         self.fps = self.video_config.get('fps', 30)
         self.bg_opacity = self.video_config.get('background_opacity', 0.4)
         self.fade_duration = self.video_config.get('fade_duration', 0.5)
+        # 나레이션 종료 후 여유 구간(초). 자막 요약 카드가 이 구간까지 노출된다.
+        self.tail_duration = self.video_config.get('tail_duration', 1.5)
         
         self.ffmpeg_path = shutil.which('ffmpeg') or 'ffmpeg'
         self.ffprobe_path = shutil.which('ffprobe') or 'ffprobe'
@@ -241,7 +243,19 @@ class VideoComposer:
             return offsets
 
     # ─── 메인 합성 ───
-    
+
+    def calc_target_duration(self, narration_duration):
+        """
+        나레이션 길이 → 최종 영상 길이(초)
+
+        자막 생성 단계(요약 카드 종료 시점)와 합성 단계가 반드시 동일한 값을
+        써야 하므로 계산을 이 메서드 하나로 통일한다.
+        """
+        max_duration = self.video_config.get('max_duration', 55)
+        if narration_duration > max_duration:
+            return float(max_duration)
+        return float(min(narration_duration + self.tail_duration, max_duration))
+
     def compose(self, background_paths, narration_path, subtitle_path, 
                 output_path, bgm_path=None, narration_duration=None):
         """
@@ -276,11 +290,10 @@ class VideoComposer:
             narration_duration = self._get_duration(narration_path)
         
         max_duration = self.video_config.get('max_duration', 55)
-        target_duration = min(narration_duration + 1.5, max_duration)
-        
+        target_duration = self.calc_target_duration(narration_duration)
+
         if narration_duration > max_duration:
             logger.warning(f"⚠️ 나레이션({narration_duration:.1f}초) > max({max_duration}초)")
-            target_duration = max_duration
         
         logger.info(f"영상 합성 시작")
         logger.info(f"  나레이션: {narration_duration:.1f}초")

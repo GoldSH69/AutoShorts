@@ -210,6 +210,11 @@ def main():
         logger.info("-" * 40)
         
         sub_gen = SubtitleGenerator(config)
+        # 요약 카드 종료 시점을 실제 영상 길이와 맞추기 위해 합성기를 먼저 생성
+        composer = VideoComposer(config)
+        target_video_duration = composer.calc_target_duration(narration_duration)
+        logger.info(f"  최종 영상 길이(예정): {target_video_duration:.1f}초")
+
         # U22 C-3: 저장 유도 요약 카드 (제목·CTA·훅 첫문장, CTA 없으면 생략)
         _cta_line = (script_data.get('cta') or '').strip().split('\n')[0][:22]
         _hook_line = (script_data.get('hook') or '').strip().split('\n')[0][:22]
@@ -222,6 +227,7 @@ def main():
             timed_segments=timed_segments,
             thumbnail_hook=script_data.get('thumbnail_hook', ''),
             summary_lines=summary_lines,
+            video_duration=target_video_duration,
         )
         
         # ─── Step 5: BGM 선택 ───
@@ -250,7 +256,7 @@ def main():
         logger.info("🎬 Step 6: 영상 합성 (다중 배경 전환)")
         logger.info("-" * 40)
         
-        composer = VideoComposer(config)
+        # composer는 Step 4에서 생성됨 (자막 요약 카드 길이 계산과 동일 인스턴스 사용)
         output_video_path, video_duration = composer.compose(
             background_paths=background_paths,
             narration_path=narration_path,
