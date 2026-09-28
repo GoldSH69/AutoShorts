@@ -119,7 +119,7 @@ class TelegramNotifier:
             comment_seed = (script_data.get('comment_cta') or '').strip()
             if comment_seed:
                 self._send_message(
-                    f"💬 첫 댓글용 문구 (복사해서 사용):\n{comment_seed}",
+                    f"{comment_seed}",
                     parse_mode=None)
                 logger.info("첫 댓글용 문구 전송 완료")
         
