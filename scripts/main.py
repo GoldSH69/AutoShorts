@@ -215,11 +215,9 @@ def main():
         target_video_duration = composer.calc_target_duration(narration_duration)
         logger.info(f"  최종 영상 길이(예정): {target_video_duration:.1f}초")
 
-        # U22 C-3: 저장 유도 요약 카드 (제목·CTA·훅 첫문장, CTA 없으면 생략)
-        _cta_line = (script_data.get('cta') or '').strip().split('\n')[0][:22]
-        _hook_line = (script_data.get('hook') or '').strip().split('\n')[0][:22]
-        _title_line = (script_data.get('title') or '').strip()[:22]
-        summary_lines = [_title_line, _cta_line, _hook_line] if _cta_line else None
+        # U33: 요약 카드 폐지 (U22 C-3 철회) — 끝부분 잘림/작은 글자/짧은 노출로 가독성 확보 불가.
+        # 자막 생략 경로(summary_lines=None)를 사용하므로 생성기/합성기 로직은 유지.
+        summary_lines = None
         subtitle_path = sub_gen.generate(
             output_path=subtitle_path,
             language=language,
