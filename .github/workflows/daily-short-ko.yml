@@ -2,7 +2,7 @@ name: 🇰🇷 Daily Korean Short
 
 on:
   schedule:
-    - cron: '27 19 * * *' # 한국 시간 오전 4시 27분 (KST)
+    - cron: '27 17 * * *' # 한국 시간 오전 2시 27분 (KST) — GitHub 예약 지연 2~4시간 감안해 앞당김
     
   workflow_dispatch:
     inputs:

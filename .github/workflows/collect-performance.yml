@@ -9,7 +9,7 @@ name: 📊 Collect Performance
 
 on:
   schedule:
-    - cron: '0 21 * * *' # 한국 시간 오전 6시 (KST) — 매일 1회
+    - cron: '0 19 * * *' # 한국 시간 오전 4시 (KST) — 매일 1회, GitHub 예약 지연 감안해 앞당김
 
   workflow_dispatch:
 

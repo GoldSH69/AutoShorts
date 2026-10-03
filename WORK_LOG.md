@@ -4,6 +4,13 @@
 
 ---
 
+## 2026-10-03 — 크론 예약 2시간 앞당김 (지연 보상)
+
+- 현상: yml 04:27 예약인데 실제 완료 06:33~08:54 (히스토리 커밋 15건 실측). GitHub 예약 지연 2~4시간 + 러너 대기 + 작업 시간.
+- 조치: `daily-short-ko.yml` 04:27 → 02:27, `collect-performance.yml` 06:00 → 04:00. 발행(17:55 예약)은 그대로라 시청자 영향 없음. en 워크플로는 채널 비활성이라 손대지 않음.
+
+---
+
 ## 2026-10-03 — P0 성과 수집 자동화 (별도 크론) 완료
 
 - 수집 코드(`analytics_collector.py` 실수집 경로 포함)는 완성돼 있었고, 없던 건 실행 장치뿐 → `.github/workflows/collect-performance.yml` 신규. 매일 06:00 KST, 24~48시간 된 영상만 `--collect`, `history/performance.json` 커밋·푸시.
