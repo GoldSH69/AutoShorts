@@ -1,0 +1,59 @@
+name: 📊 Collect Performance
+
+# 성과 루프(P0) — 자동 기록용 별도 크론. 영상 생성 잡과 분리한다.
+# - 수집 대상이 "어제·그제 발행분(24~48시간)"이라 생성 시점과 다름
+# - 수집 실패가 영상 발행을 끌어내리지 않도록 격리
+# - 실수집에는 YOUTUBE_REFRESH_TOKEN 재동의(yt-analytics.readonly) 필요.
+#   재동의 전에는 수집이 경고만 남기고 빈손으로 끝나며(리턴 0),
+#   performance.json 변경이 없어 커밋도 생기지 않는다. 안전.
+
+on:
+  schedule:
+    - cron: '0 21 * * *' # 한국 시간 오전 6시 (KST) — 매일 1회
+
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  YOUTUBE_CLIENT_ID: ${{ secrets.YOUTUBE_CLIENT_ID }}
+  YOUTUBE_CLIENT_SECRET: ${{ secrets.YOUTUBE_CLIENT_SECRET }}
+  YOUTUBE_REFRESH_TOKEN: ${{ secrets.YOUTUBE_REFRESH_TOKEN }}
+
+jobs:
+  collect-performance:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: 📥 Checkout repository
+        uses: actions/checkout@v5
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 1
+
+      - name: 🐍 Setup Python 3.11
+        uses: actions/setup-python@v5.6.0
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: 📦 Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: 📊 Collect performance
+        run: |
+          cd scripts
+          python analytics_collector.py --collect
+
+      - name: 📝 Commit performance
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add history/performance.json
+          git diff --staged --quiet && echo "ℹ️ 변경 없음 (수집 0건 또는 재동의 전)" || git commit -m "📊 Update performance $(date +%Y-%m-%d)"
+          git pull --rebase origin main || true
+          git push || echo "⚠️ Push 실패 (다음 스케줄에 재시도)"
