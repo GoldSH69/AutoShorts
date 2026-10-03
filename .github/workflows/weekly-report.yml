@@ -1,0 +1,43 @@
+name: 📊 Weekly Report
+
+# 성과 루프(P0) — 주간 성적표. 매주 토요일 아침 7시(KST)에
+# performance.json을 집계해 텔레그램으로 보낸다.
+# 읽기 전용 잡이다 (커밋·푸시 없음, 고장나도 다른 작업에 영향 없음).
+# 수집 데이터가 없으면 "수집 데이터 없음" 안내만 전송한다.
+
+on:
+  schedule:
+    - cron: '0 22 * * 5' # 토요일 오전 7시 (KST)
+
+  workflow_dispatch:
+
+env:
+  TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+  TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+
+jobs:
+  weekly-report:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: 📥 Checkout repository
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 1
+
+      - name: 🐍 Setup Python 3.11
+        uses: actions/setup-python@v5.6.0
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: 📦 Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: 📊 Send weekly report
+        run: |
+          cd scripts
+          python weekly_report.py --send

@@ -114,12 +114,19 @@ def json_dump(path, data):
 
 
 def build_analytics_service():
-    """YouTube Analytics API 서비스 생성 (실수집 시에만 호출)."""
+    """YouTube Analytics API 서비스 생성 (실수집 시에만 호출).
+
+    업로드용 토큰과 분리한다: `YOUTUBE_ANALYTICS_REFRESH_TOKEN`(성적 읽기 전용)이
+    있으면 그것을 쓰고, 없으면 기존 `YOUTUBE_REFRESH_TOKEN`으로 폴백한다.
+    한쪽 고장이 다른 쪽에 번지지 않게 하는 격리 목적이다.
+    """
     from google.oauth2.credentials import Credentials
     from googleapiclient.discovery import build
+    refresh_token = (get_env("YOUTUBE_ANALYTICS_REFRESH_TOKEN")
+                     or get_env("YOUTUBE_REFRESH_TOKEN"))
     creds = Credentials(
         token=None,
-        refresh_token=get_env("YOUTUBE_REFRESH_TOKEN"),
+        refresh_token=refresh_token,
         client_id=get_env("YOUTUBE_CLIENT_ID"),
         client_secret=get_env("YOUTUBE_CLIENT_SECRET"),
         token_uri="https://oauth2.googleapis.com/token",
