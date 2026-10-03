@@ -16,7 +16,24 @@
         "avg_view_rate": null,
         "meets_avg_view_rate": null
       }
+    },
+    "SnIamxsCbpM": {
+      "views": 0,
+      "likes": 0,
+      "comments": 0,
+      "shares": 0,
+      "averageViewDuration": 0,
+      "estimatedMinutesWatched": 0,
+      "video_id": "SnIamxsCbpM",
+      "fetched_at": "2026-10-04 06:57",
+      "summary": {
+        "video_id": "SnIamxsCbpM",
+        "views": 0,
+        "avg_view_duration": 0.0,
+        "avg_view_rate": null,
+        "meets_avg_view_rate": null
+      }
     }
   },
-  "last_updated": "2026-10-03 18:13"
+  "last_updated": "2026-10-04 06:57"
 }
