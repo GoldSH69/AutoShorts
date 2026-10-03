@@ -1,0 +1,22 @@
+{
+  "videos": {
+    "KEtMQUv0HkE": {
+      "views": 0,
+      "likes": 0,
+      "comments": 0,
+      "shares": 0,
+      "averageViewDuration": 0,
+      "estimatedMinutesWatched": 0,
+      "video_id": "KEtMQUv0HkE",
+      "fetched_at": "2026-10-03 18:13",
+      "summary": {
+        "video_id": "KEtMQUv0HkE",
+        "views": 0,
+        "avg_view_duration": 0.0,
+        "avg_view_rate": null,
+        "meets_avg_view_rate": null
+      }
+    }
+  },
+  "last_updated": "2026-10-03 18:13"
+}
