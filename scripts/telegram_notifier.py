@@ -9,7 +9,7 @@ import json
 import time
 import requests
 from pathlib import Path
-from utils import logger, get_env, get_today_str, get_weekday_name_ko
+from utils import logger, get_env, get_today_str, get_weekday_name_ko, build_youtube_title
 
 # ─── 블로그 홍보 문구 ───
 BLOG_FOOTER_TELEGRAM = "\n🧠 Insight Retreat — 심리 · 운세 · 생활정보 · AI\n👉 https://mindground.org"
@@ -83,7 +83,8 @@ class TelegramNotifier:
                 suggested_desc = youtube_metadata.get('description', '')
             else:
                 hashtags = self.config.get_category_hashtags(weekday, language)
-                suggested_title = f"{emoji} {title} | {self.config.get_channel_name(language)}"
+                # U31: 수동 업로드 제안 제목도 업로드 포맷과 동일 (채널명 제거·60자 상한)
+                suggested_title = build_youtube_title(title, emoji=emoji)
                 suggested_desc = hashtags
                 
             meta_info = f"""

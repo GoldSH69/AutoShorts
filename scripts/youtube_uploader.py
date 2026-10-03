@@ -11,7 +11,10 @@ import httplib2
 from datetime import datetime, timedelta
 from pathlib import Path
 
-from utils import logger, get_env, get_korea_now
+from utils import (
+    logger, get_env, get_korea_now,
+    YOUTUBE_TITLE_DISPLAY_MAX, build_youtube_title, truncate_title_display,
+)
 
 try:
     from google.oauth2.credentials import Credentials
@@ -152,9 +155,9 @@ class YouTubeUploader:
             except Exception as e:
                 logger.error(f"예약 게시 시간 계산 실패 (일반 업로드 진행): {e}")
         
-        # 제목 길이 제한 (YouTube: 100자)
-        if len(title) > 100:
-            title = title[:97] + "..."
+        # 제목 길이 제한 (U31: 모바일 잘림 방지 60자, YouTube 허용 100자보다 엄격)
+        if len(title) > YOUTUBE_TITLE_DISPLAY_MAX:
+            title = truncate_title_display(title)
         
         # 설명 길이 제한 (YouTube: 5000자)
         if len(description) > 5000:
@@ -296,25 +299,17 @@ def generate_upload_metadata(script_data, config, language='ko', weekday=None):
     category_name = config.get_category_name(weekday, language)
     
     title_raw = script_data.get('title', '뇌를 깨우는 30초')
-    # 개행 등 공백 정규화 (업로드 제목에 \n이 새어 들어가지 않도록)
-    title_raw = str(title_raw).replace('\\n', ' ').replace('\n', ' ')
-    title_raw = ' '.join(title_raw.split())
-    
-    # ─── 제목 (썸네일 후킹을 제목에 앞배치하지 않음) ───
-    # U17 A-8: config title_format 사용. 파싱 실패 시 기존 하드코딩으로 폴백.
+
+    # ─── 제목 (U31: 채널명 접미 제거·앞 이모지 1개·60자 상한) ───
+    # C-5: 채널명은 아바타·핸들로 이미 노출되므로 제목에서 제거.
+    # 썸네일 후킹은 제목에 앞배치하지 않는다 (기존 규칙 유지).
+    # U17 A-8: config title_format 사용. 파싱 실패 시 헬퍼 내 폴백.
     title_format = config.get(
         'upload', 'youtube', 'title_format',
-        default="{emoji} {title} | {channel_name}")
-    try:
-        title = title_format.format(
-            emoji=emoji, title=title_raw, channel_name=channel_name)
-    except (KeyError, IndexError, ValueError):
-        title = f"{emoji} {title_raw} | {channel_name}"
-    
-    if len(title) > 100:
-        title = f"{emoji} {title_raw}"
-    if len(title) > 100:
-        title = title[:97] + "..."
+        default="{emoji} {title}")
+    title = build_youtube_title(
+        title_raw, emoji=emoji,
+        title_format=title_format, channel_name=channel_name)
     
     # ─── 설명 ───
     desc_body = script_data.get('description', '')

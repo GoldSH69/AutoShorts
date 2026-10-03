@@ -349,3 +349,93 @@ def get_env(key, default=None, required=False):
     if required and not value:
         raise ValueError(f"필수 환경변수가 설정되지 않았습니다: {key}")
     return value
+
+# ─── YouTube 제목 최적화 (U31: Shorts CTR 개선) ───
+# 2026년 데이터 기준: 모바일 잘림(60~70자) 방지 + 앞 50자 키워드 집중.
+# 채널명 접미는 제거한다 — 채널 아바타·핸들로 이미 노출되는 중복이며(C-5),
+# 앞 60자 예산을 갉아먹어 CTR을 떨어뜨린다. 앞 이모티콘 1개는 쇼츠에서
+# 유지한다(Shorts +49% 조회수, vidIQ 128M 분석). 일본어 혼용은 금지하고,
+# 영어는 필요시 뒤괄호 1개까지만 허용한다(제목 예산 보호).
+YOUTUBE_TITLE_DISPLAY_MAX = 60
+
+# 제목에서 제거할 기존 브랜딩 접미 (대소문자·공백 무시 비교용)
+_TITLE_BRAND_NAMES = (
+    "뇌를깨우는30초",
+    "30secondbrainhack",
+)
+
+# 맨 앞 이모지 런 탐지용 (이모지 블록 + 변형셀렉터 + ZWJ + 공백)
+_LEADING_EMOJI_RE = re.compile(
+    r'^[\U0001F000-\U0001FAFF\u2600-\u27BF\u2B00-\u2BFF\uFE0F\u200D\s]+'
+)
+
+
+def normalize_title_text(text):
+    """제목 공백 정규화 (AGENTS 3-2: 리터럴 '\\n'과 실제 줄바꿈 모두 처리)"""
+    text = str(text).replace('\\n', ' ').replace('\n', ' ')
+    return ' '.join(text.split())
+
+
+def _is_brand_token(token):
+    """브랜딩 토큰 판정 (구분자·해시·공백 제거 후 비교)"""
+    compact = re.sub(r'[\s#_|_-]', '', str(token).lower())
+    return compact in _TITLE_BRAND_NAMES
+
+
+def strip_title_branding(text):
+    """제목에 섞인 채널명·브랜딩 접미 제거 (uploader 부가 이전의 raw 정리용)"""
+    text = normalize_title_text(text)
+    # '|' 구분자 뒤에 브랜딩이 있으면 뒷부분 절단
+    parts = re.split(r'\s*[|｜]\s*', text)
+    if len(parts) > 1 and any(_is_brand_token(p) or _is_brand_token(p.split()[0] if p.split() else '') for p in parts[1:]):
+        text = parts[0].strip()
+    # 끝 단어/해시태그가 브랜딩이면 제거
+    tokens = text.split(' ')
+    while tokens and _is_brand_token(tokens[-1]):
+        tokens.pop()
+    return ' '.join(tokens).strip()
+
+
+def strip_leading_emoji(text):
+    """맨 앞 이모지 런 제거 (uploader가 카테고리 이모지 1개를 붙이므로 중복 방지)"""
+    text = _LEADING_EMOJI_RE.sub('', text)
+    return re.sub(r'^[|｜:·\-–—\s]+', '', text).strip()
+
+
+def truncate_title_display(text, max_len=YOUTUBE_TITLE_DISPLAY_MAX):
+    """모바일 잘림 방지 절단: 단어 경계 우선 + 괄호 미닫힘 보호 + '…' 마감"""
+    text = normalize_title_text(text)
+    if len(text) <= max_len:
+        return text
+    cut = text[:max_len - 1].rstrip()
+    for opener, closer in (('(', ')'), ('[', ']'), ('（', '）')):
+        opened = cut.rfind(opener)
+        if opened != -1 and closer not in cut[opened:]:
+            cut = cut[:opened].rstrip()
+            break
+    space = cut.rfind(' ')
+    if space >= int(max_len * 0.7):
+        cut = cut[:space]
+    return (cut or text[:max_len - 1]).rstrip() + '…'
+
+
+def build_youtube_title(title_raw, emoji='', title_format='{emoji} {title}', channel_name=''):
+    """업로드용 최종 제목 조립 (채널명 접미 제거·이모지 1개·60자 상한).
+
+    커스텀 title_format에 '{channel_name}'이 명시된 경우에만 사용자 의도로
+    보고 유지한다. 그 외에는 raw에 섞인 브랜딩 잔재를 제거한다.
+    """
+    clean = strip_title_branding(title_raw)
+    clean = strip_leading_emoji(clean)
+    if not clean:
+        clean = normalize_title_text(title_raw) or '뇌를 깨우는 30초'
+    fmt = title_format or '{emoji} {title}'
+    try:
+        title = fmt.format(emoji=emoji, title=clean, channel_name=channel_name)
+    except (KeyError, IndexError, ValueError):
+        title = f"{emoji} {clean}" if emoji else clean
+    title = normalize_title_text(title)
+    if '{channel_name}' not in fmt:
+        title = strip_title_branding(title)
+        title = normalize_title_text(title)
+    return truncate_title_display(title)
