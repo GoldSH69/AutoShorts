@@ -10,7 +10,7 @@ import json
 from pathlib import Path
 from utils import (
     logger, get_project_root, get_env, safe_json_loads,
-    read_file, read_json, write_json, get_today_str, generate_hash
+    read_file, read_json, write_json, get_today_str, get_weekday, generate_hash
 )
 
 try:
@@ -305,24 +305,72 @@ SNS 캡션 규칙:
 
         return selected_no, selected_topic, selected_hook
 
-    def _format_instruction(self, no):
-        """U23 C-2: 소재 번호 기반 포맷 지시문 (해결형/자기진단형/이분법형 순환).
+    def _format_instruction(self, no=None, weekday=None):
+        """U23 C-2 수정: 요일 기반 포맷 지시문 (해결형/자기진단형/이분법형 순환).
+
+        기존 no 기반은 카테고리별 번호가 동기화되면(예: dark19/love19/rel19)
+        연속 며칠이 같은 포맷이 되어 "매번 3개 나열"로 보이는 구조적 결함이 있다.
+        1일 1영상+요일별 카테고리 구조에 맞춰 weekday(0=월) 우선으로 순환한다:
+        월/목/일=해결형, 화/금=자기진단형, 수/토=이분법형.
+        weekday가 없으면 하위호환으로 no 기반 폴백.
 
         CTA 단일문장(U2)·2단 구조(U7) 규칙과 양립하도록 CTA는 1개 호흡으로 둔다.
+        해결형/이분법형에는 N개 나열 금지 문구를 명시한다 (모델의 리스트 관성 차단).
         """
-        try:
-            slot = int(no) % 3
-        except (TypeError, ValueError):
-            slot = 0
+        slot = None
+        if weekday is not None:
+            try:
+                slot = int(weekday) % 3
+            except (TypeError, ValueError):
+                slot = None
+        if slot is None:
+            try:
+                slot = int(no) % 3
+            except (TypeError, ValueError):
+                slot = 0
         if slot == 1:
-            return ("자기진단형: 본문에 3가지 체크 항목을 제시하고, 시청자가 해당 개수를 "
-                    "세며 끝까지 보게 하세요. CTA는 '당신은 몇 개 해당되나요? 개수를 "
+            return ("자기진단형: 본문에 정확히 3가지 체크 항목을 제시하고, 시청자가 해당 개수를 "
+                    "세며 끝까지 보게 하세요. 4개 이상으로 늘리지 마세요. CTA는 '당신은 몇 개 해당되나요? 개수를 "
                     "댓글로 남겨주세요' 형식의 2단(선택+이유 한 줄)으로.")
         if slot == 2:
-            return ("이분법 논쟁형: A형 vs B형 양자택일 구도로 서술하고, 댓글에서 편이 "
+            return ("이분법 논쟁형: A형 vs B형 양자택일 구도로만 서술하세요. "
+                    "첫째/둘째/셋째, 1.2.3., N가지식 3개 이상 나열은 절대 금지입니다. "
+                    "3번째 유형·3번째 경우를 만들지 마세요. 댓글에서 편이 "
                     "갈리게 하세요. CTA는 '당신은 A형인가요, B형인가요? 그렇게 생각한 "
                     "이유도 한 줄로 남겨주세요' 형식의 2단으로.")
-        return ("해결형: 프롬프트의 4단계 구조대로 문제→원리→해결 서사로 작성하세요.")
+        return ("해결형: 프롬프트의 4단계 구조대로 문제→원리→해결 서사로 작성하세요. "
+                "첫째/둘째/셋째, 1.2.3., N가지식 3개 이상 나열은 절대 금지입니다. "
+                "One-Action Rule(단 1가지 즉각 실천)만 제시하고, 2번째·3번째 팁을 추가하지 마세요.")
+
+    def _format_slot(self, no=None, weekday=None):
+        """로테이션 슬롯 번호만 반환 (검증용). _format_instruction과 동일 규칙."""
+        if weekday is not None:
+            try:
+                return int(weekday) % 3
+            except (TypeError, ValueError):
+                pass
+        try:
+            return int(no) % 3
+        except (TypeError, ValueError):
+            return 0
+
+    def _has_forbidden_listicle(self, text):
+        """해결형/이분법 슬롯에서 금지된 열거형 나열이 있는지 검사.
+
+        숫자 자체(24시간, 30% 등)는 허용하고, 열거 마커만 본다:
+        첫째/둘째/셋째, 첫 번째/두 번째/세 번째 3종 완결, N가지(N>=2) 표현.
+        """
+        if not text:
+            return False
+        markers = re.findall(r'첫째|둘째|셋째', text)
+        if len(markers) >= 2:
+            return True
+        ordered = re.findall(r'첫 번째|두 번째|세 번째', text)
+        if len(ordered) >= 2:
+            return True
+        if re.search(r'[2-9]\s*가지', text):
+            return True
+        return False
         
     # ─── Gemini API 호출 ───
     
@@ -660,6 +708,20 @@ SNS 캡션 규칙:
         selected_no, forced_topic, thumbnail_hook = self._select_sequential_topic(category_id)
         self.selected_no = selected_no
         self.selected_thumbnail_hook = thumbnail_hook
+
+        # U23 C-2 수정: 포맷은 요일 기준 (weekday 없으면 KST 오늘 요일로 보정).
+        # 주제 번호(no)는 소재 순환 전용으로 분리한다.
+        if weekday is None:
+            try:
+                weekday = get_weekday()
+            except Exception:
+                weekday = None
+        self.current_weekday = weekday
+        self.current_format_slot = self._format_slot(selected_no, weekday)
+        self._forced_topic_cache = forced_topic
+        slot_names = {0: '해결형', 1: '자기진단형', 2: '이분법형'}
+        logger.info(f"  포맷: {slot_names.get(self.current_format_slot, '?')} "
+                    f"(weekday={weekday}, no={selected_no})")
         
         # 프롬프트 변수 치환
         prompt = template.replace('{previous_topics}', previous_topics)
@@ -670,8 +732,8 @@ SNS 캡션 규칙:
         # A-1: 구형 플레이스홀더 {min}/{max}도 함께 치환 (긴 것 먼저 치환하므로 안전)
         prompt = prompt.replace('{min}', str(SCRIPT_MIN_CHARS))
         prompt = prompt.replace('{max}', str(SCRIPT_MAX_CHARS))
-        # U23 C-2: 소재 번호 기반 포맷 로테이션 (해결/진단/이분법 순환)
-        prompt = prompt.replace('{video_format}', self._format_instruction(selected_no))
+        # U23 C-2: 요일 기반 포맷 로테이션 (해결/진단/이분법 순환)
+        prompt = prompt.replace('{video_format}', self._format_instruction(selected_no, weekday))
         
         # 댓글/저장/참여 유도 CTA 문구를 주제에 맞춰 자연스럽게 생성하도록 프롬프트 지침 주입
         # U2 단일원천 규칙: 나레이션 CTA는 full_script 마지막 1문장만. cta 필드는 그 문장의 그대로 복사.
@@ -909,6 +971,27 @@ SNS 캡션 규칙:
         if self._has_dangling_ending(data['full_script']):
             logger.warning(f"  ❌ 스크립트가 접속사/불완결로 마무리됨: ...{data['full_script'][-40:]}")
             return False
+
+        # ─── 해결형/이분법 슬롯에서 열거형 나열 거부 (재생성 유도) ───
+        # 자기진단형(slot 1)에서만 3가지 나열 허용. 그 외 슬롯에서 모델이
+        # 관성적으로 "첫째/둘째/셋째, N가지"를 쓰면 거부한다. 숫자 자체
+        # (24시간, 30% 등)는 허용하므로 _has_forbidden_listicle은 마커만 본다.
+        # forced_topic 자체가 N가지 소재면(372개 중 7개) 주제 우선으로 통과시킨다.
+        try:
+            slot = getattr(self, 'current_format_slot', None)
+            if slot is None:
+                slot = self._format_slot(getattr(self, 'selected_no', 0),
+                                         getattr(self, 'current_weekday', None))
+        except Exception:
+            slot = 0
+        if slot in (0, 2) and self._has_forbidden_listicle(data['full_script']):
+            try:
+                forced = getattr(self, '_forced_topic_cache', '')
+            except Exception:
+                forced = ''
+            if not (forced and re.search(r'[2-9]\s*가지', str(forced))):
+                logger.warning(f"  ❌ 해결/이분법 슬롯에 열거형 나열: ...{data['full_script'][-60:]}")
+                return False
 
         # 기본값 채우기
         if not data.get('hook'):
