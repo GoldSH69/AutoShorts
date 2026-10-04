@@ -33,7 +33,24 @@
         "avg_view_rate": null,
         "meets_avg_view_rate": null
       }
+    },
+    "LV_HT-VzvZE": {
+      "views": 0,
+      "likes": 0,
+      "comments": 0,
+      "shares": 0,
+      "averageViewDuration": 0,
+      "estimatedMinutesWatched": 0,
+      "video_id": "LV_HT-VzvZE",
+      "fetched_at": "2026-10-05 07:10",
+      "summary": {
+        "video_id": "LV_HT-VzvZE",
+        "views": 0,
+        "avg_view_duration": 0.0,
+        "avg_view_rate": null,
+        "meets_avg_view_rate": null
+      }
     }
   },
-  "last_updated": "2026-10-04 06:57"
+  "last_updated": "2026-10-05 07:10"
 }
