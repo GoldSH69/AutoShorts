@@ -67,7 +67,24 @@
         "avg_view_rate": null,
         "meets_avg_view_rate": null
       }
+    },
+    "nn0-BpfTABU": {
+      "views": 0,
+      "likes": 0,
+      "comments": 0,
+      "shares": 0,
+      "averageViewDuration": 0,
+      "estimatedMinutesWatched": 0,
+      "video_id": "nn0-BpfTABU",
+      "fetched_at": "2026-10-07 07:52",
+      "summary": {
+        "video_id": "nn0-BpfTABU",
+        "views": 0,
+        "avg_view_duration": 0.0,
+        "avg_view_rate": null,
+        "meets_avg_view_rate": null
+      }
     }
   },
-  "last_updated": "2026-10-06 09:33"
+  "last_updated": "2026-10-07 07:52"
 }
