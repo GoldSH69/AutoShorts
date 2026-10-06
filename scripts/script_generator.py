@@ -71,6 +71,17 @@ TIKTOK_DEFAULT_HASHTAGS = [
     "#심리학", "#자기계발", "#뇌과학", "#psychology", "#mindset",
 ]
 
+# ─── 제목 맨 뒤 범용 영어 괄호 제거용 (U37: 관련 용어만 허용 후처리) ───
+# 프롬프트 규칙을 모델이 어겨 "(Psychology)" 같은 범용어를 붙여도
+# 리젝(재생성/API 재호출) 없이 괄호만 벗겨낸다. 관련 용어는 유지.
+GENERIC_TITLE_EN_PAREN = frozenset({
+    "psychology", "lovepsychology", "darkpsychology",
+    "self", "selfimprovement", "selfdevelopment",
+    "love", "brain", "mind", "mindset",
+    "psy", "psycho", "psych", "brainhack",
+    "shorts", "short", "healing", "life", "heart",
+})
+
 
 def is_thinking_model(model_name):
     """thinking 모델인지 확인 (lite는 제외)"""
@@ -179,7 +190,7 @@ SNS 캡션 규칙:
 반드시 아래 JSON 형식으로만 출력하세요. 해시태그는 반드시 배열(리스트)로 출력하세요.
 
 {{
-  "title": "영상 제목 (최대 30자, 이모지·채널명·일본어 금지, 필요시 영어 키워드 1개만 뒤 (괄호)로)",
+  "title": "영상 제목 (40자 이내, 앞 15자 안에 핵심 한글 검색어 1개 필수. 이모지·채널명·일본어 금지. 영어는 본문 근거용어와 일치하는 관련 심리학/뇌과학 용어일 때만 맨 뒤 (괄호) 1개, 없으면 생략. (Psychology)(Self)(Love)(Brain) 같은 범용어·카테고리명 금지)",
   "hook": "첫 3초 후킹 문장",
   "body": "본문 내용",
   "cta": "마무리 CTA",
@@ -940,6 +951,15 @@ SNS 캡션 규칙:
         # 실제 줄바꿈 + 리터럴 '\n' 문자열 모두 공백으로 치환 후 정규화
         title = str(title).replace('\\n', ' ').replace('\n', ' ')
         title = ' '.join(title.split())
+        # U37: 맨 뒤 범용 영어 괄호 제거 (리젝 없이 strip — 관련 용어는 유지)
+        # 예: "어색한 사람과 단둘이 있을 때 (Psychology)" → 괄호 제거
+        #     "연애심리 미칠듯이 빠져드는 뇌의 비밀 (Limerence)" → 유지
+        m = re.search(r'\s*\(([^()]*)\)\s*$', title)
+        if m:
+            inner_norm = re.sub(r'[\s\-_]+', '', m.group(1).lower())
+            if inner_norm in GENERIC_TITLE_EN_PAREN:
+                title = title[:m.start()].rstrip()
+                logger.info(f"  제목 범용영어 괄호 제거: '({m.group(1)})'")
         data['title'] = title
         if not title or len(title) < 2:
             logger.warning(f"검증 실패: title 없음")
