@@ -118,7 +118,24 @@
         "avg_view_rate": null,
         "meets_avg_view_rate": null
       }
+    },
+    "rX68kcnahj0": {
+      "views": 0,
+      "likes": 0,
+      "comments": 0,
+      "shares": 0,
+      "averageViewDuration": 0,
+      "estimatedMinutesWatched": 0,
+      "video_id": "rX68kcnahj0",
+      "fetched_at": "2026-10-10 08:00",
+      "summary": {
+        "video_id": "rX68kcnahj0",
+        "views": 0,
+        "avg_view_duration": 0.0,
+        "avg_view_rate": null,
+        "meets_avg_view_rate": null
+      }
     }
   },
-  "last_updated": "2026-10-09 08:37"
+  "last_updated": "2026-10-10 08:00"
 }
