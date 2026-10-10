@@ -14,7 +14,6 @@ on:
         type: choice
         options:
           - 'daily-short-ko.yml'
-          - 'daily-short-en.yml'
           - 'manual-trigger.yml'
 
 permissions:

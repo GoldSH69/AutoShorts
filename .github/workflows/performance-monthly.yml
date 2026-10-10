@@ -69,4 +69,4 @@ jobs:
       - name: 📊 Send monthly report
         run: |
           cd scripts
-          python weekly_report.py --send
+          python monthly_report.py --send

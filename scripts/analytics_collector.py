@@ -44,12 +44,6 @@ TARGET_AVG_VIEW_RATE = 0.90
 METRICS = "views,likes,comments,shares,averageViewDuration,estimatedMinutesWatched"
 
 
-def parse_history_date(date_str):
-    """히스토리 날짜(YYYY-MM-DD, KST 자정 기준)를 aware datetime으로."""
-    kst = timezone(timedelta(hours=9))
-    return datetime.strptime(str(date_str), "%Y-%m-%d").replace(tzinfo=kst)
-
-
 def get_publish_datetime(date_str, scheduling_time=DEFAULT_SCHEDULING_TIME):
     """히스토리 날짜의 실제 공개시각 추정 (당일 예약 시각, KST).
 
