@@ -1,14 +1,18 @@
 #!/usr/bin/env python3
-"""발행 후 성과 수집 스켈레톤 (E-1, U9).
+"""발행 후 성과 수집 (월간 롤링 배치).
 
 - `history/generated_topics.json`에서 video_id가 기록된 영상을 찾는다.
-  (video_id는 업로드 성공 시 main.py가 히스토리에 보충 기록한다. U9 이전
-  발행분에는 video_id가 없어 수집 대상에서 제외된다.)
-- 발행 후 24~48시간 경과분을 YouTube Analytics API로 조회해
-  `history/performance.json`에 누적한다.
+  (video_id는 업로드 성공 시 main.py가 히스토리에 보충 기록한다.)
+- 매주 토요일에 최근 30일치(롤링)를 YouTube Analytics API로 조회해
+  `history/performance.json`에 누적(덮어쓰기)한다.
 - 판단 기준(0920개선사항.md 기준선 5): 시청 vs 스와이프 70% 이상,
   평균 시청률 90% 이상. 스와이프율은 Data/Analytics API로 직접 제공되지
   않으므로 조회·참여·평균시청시간을 수집하고 목표치와 비교한다.
+- 발행시각 추정: 히스토리 `date` 당일 `config.yml` 예약 시각(기본 17:55).
+  자정 기준 24~48시간 창을 쓰면 예약분(공개 후 약 13~15시간)을
+  미성숙 상태로 긁어 0으로 영구 동결하므로, 롤링 30일 + 항상 덮어쓰기로
+  성숙치가 들어오면 자동 교정된다. 쇼츠는 수일 내 수치가 굳으므로
+  첫7일/누적 구분 없이 공개일~현재 누적치로 단순 비교한다.
 
 사용법:
     python scripts/analytics_collector.py            # 드라이런 (대상 목록만)
@@ -29,8 +33,10 @@ from utils import logger, get_project_root, get_korea_now, get_env
 HISTORY_FILE = "history/generated_topics.json"
 PERFORMANCE_FILE = "history/performance.json"
 
-MIN_AGE_HOURS = 24
-MAX_AGE_HOURS = 48
+# 토요일 롤링 배치: 최근 30일치(공개일 기준)를 항상 덮어쓰기 수집.
+WINDOW_DAYS = 30
+# 예약 발행 시각 (config.yml scheduling.time과 동기화, 폴백값)
+DEFAULT_SCHEDULING_TIME = "17:55"
 
 # 0920개선사항.md 기준선 5의 24시간 점검 목표치
 TARGET_AVG_VIEW_RATE = 0.90
@@ -44,24 +50,59 @@ def parse_history_date(date_str):
     return datetime.strptime(str(date_str), "%Y-%m-%d").replace(tzinfo=kst)
 
 
-def select_targets(topics, performance, now=None):
+def get_publish_datetime(date_str, scheduling_time=DEFAULT_SCHEDULING_TIME):
+    """히스토리 날짜의 실제 공개시각 추정 (당일 예약 시각, KST).
+
+    업로드는 새벽에 끝나지만 공개는 당일 17:55(private 예약)이므로,
+    자정 기준 나이 계산은 공개 후 나이를 약 18시간 부풀린다.
+    """
+    kst = timezone(timedelta(hours=9))
+    try:
+        hour, minute = map(int, str(scheduling_time).split(":"))
+    except (ValueError, TypeError, AttributeError):
+        hour, minute = 17, 55
+    return datetime.strptime(str(date_str), "%Y-%m-%d").replace(
+        tzinfo=kst, hour=hour, minute=minute, second=0, microsecond=0)
+
+
+def get_scheduling_time(root):
+    """config.yml의 예약 시각을 읽는다 (실패 시 기본값)."""
+    try:
+        from config_loader import Config
+        cfg = Config(str(Path(root) / "config" / "config.yml"))
+        return cfg.get("upload", "youtube", "scheduling", "time",
+                       default=DEFAULT_SCHEDULING_TIME)
+    except Exception:
+        return DEFAULT_SCHEDULING_TIME
+
+
+def select_targets(topics, performance=None, now=None, window_days=WINDOW_DAYS,
+                   scheduling_time=DEFAULT_SCHEDULING_TIME):
     """수집 대상 선정 (순수 함수, 오프라인 테스트 가능).
 
-    조건: video_id 있음 + 발행 후 24~48시간 + 아직 미수집.
+    조건: video_id 있음 + 공개일이 최근 window_days 이내 + 이미 공개됨.
+    performance(수집済み)여도 제외하지 않고 항상 포함한다 — 매주 토요일
+    덮어쓰기로 성숙치가 들어오면 0이 자동 교정된다.
+    performance 인자는 하위호환용으로만 유지한다.
     """
     now = now or get_korea_now()
-    collected = set((performance or {}).get("videos", {}).keys())
+    cutoff = (now - timedelta(days=window_days)).strftime("%Y-%m-%d")
     targets = []
     for t in topics:
         video_id = (t.get("video_id") or "").strip()
-        if not video_id or video_id in collected:
+        if not video_id:
+            continue
+        date_str = str(t.get("date", ""))
+        if date_str < cutoff:
             continue
         try:
-            age = now - parse_history_date(t.get("date", ""))
+            publish_at = get_publish_datetime(date_str, scheduling_time)
         except (ValueError, TypeError):
             continue
-        if timedelta(hours=MIN_AGE_HOURS) <= age <= timedelta(hours=MAX_AGE_HOURS):
-            targets.append(t)
+        if publish_at > now:
+            # 아직 공개 전(당일 예약 대기) → 차주에 수집
+            continue
+        targets.append(t)
     return targets
 
 
@@ -140,12 +181,17 @@ def build_analytics_service():
     return build("youtubeAnalytics", "v2", credentials=creds)
 
 
-def fetch_metrics(service, video_id):
-    """단일 영상 지표 조회 (실수집 시에만 호출)."""
+def fetch_metrics(service, video_id, publish_date=None):
+    """단일 영상 지표 조회 (실수집 시에만 호출).
+
+    공개일~현재 누적치로 조회한다. 쇼츠는 수일 내 수치가 굳으므로
+    첫7일/누적 구분 없이 단순 비교한다.
+    """
     now = get_korea_now()
+    start = publish_date or (now - timedelta(days=WINDOW_DAYS)).strftime("%Y-%m-%d")
     res = service.reports().query(
         ids="channel==MINE",
-        startDate=(now - timedelta(days=7)).strftime("%Y-%m-%d"),
+        startDate=start,
         endDate=now.strftime("%Y-%m-%d"),
         metrics=METRICS,
         filters=f"video=={video_id}",
@@ -176,11 +222,17 @@ def main():
     with_id = sum(1 for t in topics if (t.get("video_id") or "").strip())
     logger.info(f"히스토리 {len(topics)}건 중 video_id 기록 {with_id}건")
 
-    targets = select_targets(topics, performance)
-    logger.info(f"수집 대상 {len(targets)}건 (발행 후 {MIN_AGE_HOURS}~{MAX_AGE_HOURS}시간, 미수집)")
+    scheduling_time = get_scheduling_time(root)
+    now = get_korea_now()
+    targets = select_targets(topics, performance, now=now,
+                             scheduling_time=scheduling_time)
+    logger.info(f"수집 대상 {len(targets)}건 (최근 {WINDOW_DAYS}일 공개분, 항상 덮어쓰기)")
     for t in targets:
+        pub = get_publish_datetime(t.get("date", ""), scheduling_time)
+        age_days = (now - pub).total_seconds() / 86400
         logger.info(f"  - {t.get('date')} [{t.get('category')} no.{t.get('no')}]"
-                    f" {t.get('video_id')} '{t.get('title', '')[:30]}'")
+                    f" {t.get('video_id')} '{t.get('title', '')[:30]}'"
+                    f" (공개 {age_days:.1f}일차)")
 
     if not args.collect:
         logger.info("드라이런 종료 (실수집은 --collect). API 호출 없음.")
@@ -190,7 +242,13 @@ def main():
     entries = []
     for t in targets:
         try:
-            entries.append(fetch_metrics(service, t["video_id"]))
+            e = fetch_metrics(service, t["video_id"],
+                              publish_date=str(t.get("date", "")))
+            e["publish_at"] = get_publish_datetime(
+                t.get("date", ""), scheduling_time).strftime("%Y-%m-%d %H:%M")
+            e["window_start"] = str(t.get("date", ""))
+            e["window_end"] = now.strftime("%Y-%m-%d")
+            entries.append(e)
         except Exception as e:
             logger.warning(f"  수집 실패 {t.get('video_id')}: {e}")
     perf = merge_performance(root / PERFORMANCE_FILE, entries)

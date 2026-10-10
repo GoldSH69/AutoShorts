@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
-"""주간 성적표 (P0 성과 루프의 사람-facing 출력).
+"""월간 성적표 (P0 성과 루프의 사람-facing 출력).
 
 - `history/generated_topics.json` + `history/performance.json`을 읽어
-  주간 TOP3·카테고리 평균·경고·리믹스 후보를 계산한다 (고정 규칙, 판단 없음).
+  최근 30일 TOP3·카테고리 평균·경고·리믹스 후보를 계산한다 (고정 규칙, 판단 없음).
 - 기본은 화면 출력(드라이런). `--send`를 붙이면 텔레그램으로 전송한다.
 - 수집 데이터가 없으면 "수집 데이터 없음" 안내만 낸다 (리턴 0).
 - 외부 API 호출 없음 (읽는 건 로컬 JSON, 보내는 건 텔레그램뿐).
+- 수집은 매주 토요일 롤링 30일 덮어쓰기이므로, 공개 1~2일차는
+  다음 토요일에 성숙치로 자동 교정된다.
 """
 
 import argparse
@@ -45,7 +47,7 @@ def title_tokens(text):
 def build_report(history_path, performance_path, topics_path, now=None):
     """성적표 텍스트 생성 (순수 계산, 입출력 없음)."""
     now = now or get_korea_now()
-    week_ago = (now - timedelta(days=7)).strftime("%Y-%m-%d")
+    month_ago = (now - timedelta(days=30)).strftime("%Y-%m-%d")
 
     history = load_json(history_path)
     performance = load_json(performance_path)
@@ -58,15 +60,15 @@ def build_report(history_path, performance_path, topics_path, now=None):
             by_id[vid] = t
 
     if not videos or not by_id:
-        return ("📊 주간 성적표\n"
+        return ("📊 월간 성적표\n"
                 "수집 데이터 없음 (토큰 재동의 후 기록 시작).\n"
                 "재동의 전에도 리포트는 매주 오되 내용 없이 끝남.")
 
-    # 이번 주(최근 7일) 수집분만 집계
+    # 최근 30일 공개분만 집계 (공개일 기준, 누적치)
     rows = []
     for vid, e in videos.items():
         t = by_id.get(vid)
-        if not t or str(t.get("date", "")) < week_ago:
+        if not t or str(t.get("date", "")) < month_ago:
             continue
         views = int(e.get("views") or 0)
         likes = int(e.get("likes") or 0)
@@ -82,10 +84,10 @@ def build_report(history_path, performance_path, topics_path, now=None):
     rows.sort(key=lambda r: r["views"], reverse=True)
 
     if not rows:
-        return ("📊 주간 성적표\n"
-                "최근 7일 수집분 없음 (발행 후 24~48시간 뒤부터 쌓임).")
+        return ("📊 월간 성적표\n"
+                "최근 30일 수집분 없음 (토요일 롤링 수집 후부터 쌓임).")
 
-    lines = [f"📊 주간 성적표 ({week_ago}~{now.strftime('%Y-%m-%d')})"]
+    lines = [f"📊 월간 성적표 ({month_ago}~{now.strftime('%Y-%m-%d')}, 최근 30일 누적)"]
     for i, r in enumerate(rows[:3], 1):
         medal = ["🥇", "🥈", "🥉"][i - 1]
         lines.append(
@@ -133,7 +135,7 @@ def build_report(history_path, performance_path, topics_path, now=None):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="주간 성적표 (P0)")
+    parser = argparse.ArgumentParser(description="월간 성적표 (P0)")
     parser.add_argument("--send", action="store_true",
                         help="텔레그램으로 실제 전송 (기본: 화면 출력만)")
     parser.add_argument("--history-file", default=None)
@@ -158,10 +160,10 @@ def main():
     from telegram_notifier import TelegramNotifier
     config = Config(args.config)
     notifier = TelegramNotifier(config)
-    if notifier.send_custom(f"📊 [뇌를 깨우는 30초] 주간 성적표\n\n{report}"):
-        logger.info("주간 성적표 전송 완료")
+    if notifier.send_custom(f"📊 [뇌를 깨우는 30초] 월간 성적표\n\n{report}"):
+        logger.info("월간 성적표 전송 완료")
     else:
-        logger.warning("주간 성적표 전송 실패/비활성")
+        logger.warning("월간 성적표 전송 실패/비활성")
     return 0
 
 
