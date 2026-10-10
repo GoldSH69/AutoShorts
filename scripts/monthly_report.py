@@ -74,10 +74,13 @@ def build_report(history_path, performance_path, topics_path, now=None):
         likes = int(e.get("likes") or 0)
         comments = int(e.get("comments") or 0)
         avg_sec = float(e.get("averageViewDuration") or 0)
+        dur = float(e.get("videoDuration") or 0)
+        rate = (avg_sec / dur) if dur > 0 else None
         eng = (likes + comments) / views if views > 0 else 0.0
         rows.append({
             "video_id": vid, "views": views, "likes": likes,
-            "comments": comments, "avg_sec": avg_sec, "eng": eng,
+            "comments": comments, "avg_sec": avg_sec, "rate": rate,
+            "eng": eng,
             "date": t.get("date", ""), "category": t.get("category", ""),
             "no": t.get("no", ""), "title": t.get("title", ""),
         })
@@ -90,9 +93,11 @@ def build_report(history_path, performance_path, topics_path, now=None):
     lines = [f"📊 월간 성적표 ({month_ago}~{now.strftime('%Y-%m-%d')}, 최근 30일 누적)"]
     for i, r in enumerate(rows[:3], 1):
         medal = ["🥇", "🥈", "🥉"][i - 1]
+        rate_txt = (f" / 유지율 {r['rate'] * 100:.0f}%"
+                    if r.get("rate") else " / 유지율 -")
         lines.append(
             f"{medal} {r['category']} no.{r['no']} — "
-            f"{r['views']:,}회 / 평균 {r['avg_sec']:.1f}초 / 댓글 {r['comments']}")
+            f"{r['views']:,}회 / 평균 {r['avg_sec']:.1f}초{rate_txt} / 댓글 {r['comments']}")
 
     # 카테고리 평균 (조회수)
     cats = {}
@@ -112,6 +117,10 @@ def build_report(history_path, performance_path, topics_path, now=None):
     # 경고: 댓글 0이 3편 연속 → 참여 저조
     if len(by_date) >= 3 and all(r["comments"] == 0 for r in by_date[:3]):
         lines.append("⚠️ 참여 저조 (댓글 0이 3편 연속)")
+    # 경고: 1등 유지율 90% 미만 → 길이(45초) 점검 신호
+    top_rate = rows[0].get("rate")
+    if top_rate is not None and top_rate < 0.90:
+        lines.append(f"⚠️ 유지율 미달 (1등 {top_rate * 100:.0f}% < 목표 90%)")
 
     # 리믹스 후보: 주간 1등과 같은 카테고리 미발행분 중 제목 겹침 상위 3개
     winner = rows[0]

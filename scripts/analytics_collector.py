@@ -8,6 +8,8 @@
 - 판단 기준(0920개선사항.md 기준선 5): 시청 vs 스와이프 70% 이상,
   평균 시청률 90% 이상. 스와이프율은 Data/Analytics API로 직접 제공되지
   않으므로 조회·참여·평균시청시간을 수집하고 목표치와 비교한다.
+  평균시청률 분모용 영상 길이는 Data API(videos.list, 50개 배치 1쿼리)로
+  함께 수집한다.
 - 발행시각 추정: 히스토리 `date` 당일 `config.yml` 예약 시각(기본 17:55).
   자정 기준 24~48시간 창을 쓰면 예약분(공개 후 약 13~15시간)을
   미성숙 상태로 긁어 0으로 영구 동결하므로, 롤링 30일 + 항상 덮어쓰기로
@@ -24,6 +26,7 @@
 """
 
 import argparse
+import re
 import sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -43,12 +46,27 @@ TARGET_AVG_VIEW_RATE = 0.90
 
 METRICS = "views,likes,comments,shares,averageViewDuration,estimatedMinutesWatched"
 
+# 실측 지표 키 (빈 응답 판정용 — 이 키가 하나도 없으면 미집계로 본다)
+METRIC_KEYS = ("views", "likes", "comments", "shares",
+               "averageViewDuration", "estimatedMinutesWatched")
+
+
+def parse_iso8601_duration(text):
+    """YouTube contentDetails.duration(ISO8601, 예: PT1M5S)을 초로 변환."""
+    m = re.fullmatch(r'PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?', str(text or ''))
+    if not m:
+        return 0
+    h, mnt, s = (int(g) if g else 0 for g in m.groups())
+    return h * 3600 + mnt * 60 + s
+
 
 def get_publish_datetime(date_str, scheduling_time=DEFAULT_SCHEDULING_TIME):
     """히스토리 날짜의 실제 공개시각 추정 (당일 예약 시각, KST).
 
     업로드는 새벽에 끝나지만 공개는 당일 17:55(private 예약)이므로,
     자정 기준 나이 계산은 공개 후 나이를 약 18시간 부풀린다.
+    알려진 한계: 일간잡이 17:55를 넘겨 지연 실행되면 실제 공개가 다음 날로
+    밀려 추정치가 하루 빠르다. 통상 지연 2~4시간이라 무시한다.
     """
     kst = timezone(timedelta(hours=9))
     try:
@@ -127,6 +145,12 @@ def merge_performance(performance_path, entries, fetched_at=None):
         vid = e.get("video_id")
         if not vid:
             continue
+        has_metrics = any(k in e for k in METRIC_KEYS)
+        old = perf["videos"].get(vid, {})
+        if (not has_metrics and any(k in old for k in METRIC_KEYS)):
+            # 감사 적발: API 깜빡임으로 빈 응답이 와도 기존 실측치를 지우지 않는다.
+            # (미집계 신상은 placeholder로 남겨 다음 배치에서 채운다)
+            continue
         record = dict(e)
         record["fetched_at"] = fetched_at
         record["summary"] = summarize(e)
@@ -173,6 +197,42 @@ def build_analytics_service():
         scopes=["https://www.googleapis.com/auth/yt-analytics.readonly"],
     )
     return build("youtubeAnalytics", "v2", credentials=creds)
+
+
+def build_data_service():
+    """영상 길이 조회용 Data API 클라이언트 (실수집 시에만 호출).
+
+    공개 영상의 contentDetails만 읽으므로 업로드용 자격증명 조를 재사용한다.
+    스코프는 기존 부여된 youtube.upload 그대로 둔다 (재동의 불필요).
+    """
+    from google.oauth2.credentials import Credentials
+    from googleapiclient.discovery import build
+    creds = Credentials(
+        token=None,
+        refresh_token=get_env("YOUTUBE_REFRESH_TOKEN"),
+        client_id=get_env("YOUTUBE_CLIENT_ID"),
+        client_secret=get_env("YOUTUBE_CLIENT_SECRET"),
+        token_uri="https://oauth2.googleapis.com/token",
+        scopes=["https://www.googleapis.com/auth/youtube.upload"],
+    )
+    return build("youtube", "v3", credentials=creds, cache_discovery=False)
+
+
+def fetch_durations(service, video_ids):
+    """여러 영상의 길이(초) 조회, 50개씩 배치 (실수집 시에만 호출)."""
+    out = {}
+    ids = [v for v in dict.fromkeys(video_ids) if v]
+    for i in range(0, len(ids), 50):
+        chunk = ids[i:i + 50]
+        res = service.videos().list(
+            part="contentDetails", id=",".join(chunk)).execute()
+        for item in res.get("items", []):
+            vid = item.get("id", "")
+            secs = parse_iso8601_duration(
+                (item.get("contentDetails") or {}).get("duration"))
+            if vid and secs > 0:
+                out[vid] = secs
+    return out
 
 
 def fetch_metrics(service, video_id, publish_date=None):
@@ -245,6 +305,17 @@ def main():
             entries.append(e)
         except Exception as e:
             logger.warning(f"  수집 실패 {t.get('video_id')}: {e}")
+
+    try:
+        durations = fetch_durations(
+            build_data_service(), [t["video_id"] for t in targets])
+        logger.info(f"길이 조회: {len(durations)}건")
+    except Exception as e:
+        logger.warning(f"  길이 조회 실패 (유지율 없이 진행): {e}")
+        durations = {}
+    for e in entries:
+        if e.get("video_id") in durations:
+            e["videoDuration"] = durations[e["video_id"]]
     perf = merge_performance(root / PERFORMANCE_FILE, entries)
     logger.info(f"수집 완료: {len(entries)}건 (누적 {len(perf.get('videos', {}))}건)")
     return 0

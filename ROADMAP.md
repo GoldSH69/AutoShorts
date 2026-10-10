@@ -148,6 +148,9 @@
 ### 46. 성과 워크플로 단일화 (P0)
 * **내용**: `performance-monthly.yml` 1개(토 05시, 수집→커밋→전송 순차, timeout 15분). 기존 `collect-performance.yml`·`weekly-report.yml` 삭제.
 
+### 47. videoDuration 수집 + 유지율 표시 (P0)
+* **내용**: Data API 배치 조회로 영상 길이 수집 → `summarize()` 평균시청률 계산 → 리포트 TOP3 유지율 표시·1등 90% 미달 경고. 빈 응답 덮어쓰기 방지 포함.
+
 ---
 
 ## 🟨 향후 개선 아이디어 (Future Ideas)
