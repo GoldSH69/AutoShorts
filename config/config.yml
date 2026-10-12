@@ -129,13 +129,13 @@ categories:
 # ─── Gemini API ───
 gemini:
   # 주력 모델
-  model: "gemini-3.6-flash"
+  model: "gemini-3.8-flash"
   
   # 백업 모델 (순서대로 시도)
   fallback_models:
-    - "gemini-3.5-flash"
+    - "gemini-3.7-flash"
+    - "gemini-3.6-flash"
     - "gemini-3.5-flash-lite"
-    - "gemini-2.5-flash"
   
   # 사용 불가 모델 (참고용 메모)
   # - gemini-1.5-flash: 목록에서 삭제됨

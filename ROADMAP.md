@@ -151,6 +151,9 @@
 ### 47. videoDuration 수집 + 유지율 표시 (P0)
 * **내용**: Data API 배치 조회로 영상 길이 수집 → `summarize()` 평균시청률 계산 → 리포트 TOP3 유지율 표시·1등 90% 미달 경고. 빈 응답 덮어쓰기 방지 포함.
 
+### 48. Gemini 모델 순서 갱신 (2026-10-12)
+* **내용**: 사용가능 모델 목록 확인 후 주력 `gemini-3.8-flash`, 폴백 `3.7-flash → 3.6-flash → 3.5-flash-lite` 순으로 `config.yml`만 변경. 폴백 로직 무변경.
+
 ---
 
 ## 🟨 향후 개선 아이디어 (Future Ideas)

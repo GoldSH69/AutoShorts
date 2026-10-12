@@ -4,6 +4,14 @@
 
 ---
 
+## 2026-10-12 — Gemini 모델 순서 갱신 (3.8-flash 주력)
+
+- 배경(사용자 확인): 키로 조회한 사용가능 모델 목록에 `gemini-3.8-flash`, `gemini-3.7-flash`가 새로 확인됨. 기존 주력 `3.6-flash`보다 최신.
+- 수정: `config/config.yml`만 변경 — 주력 `gemini-3.8-flash`, 폴백 `3.7-flash → 3.6-flash → 3.5-flash-lite` 순. 폴백 로직(`script_generator.py`) 무변경, 모델명만 교체라 영향 최소.
+- 검증: YAML 파싱 + `Config.get_gemini_model/fallback_models` 시도순서 확인 + `py_compile` 통과. 외부 API 호출 없음.
+
+---
+
 ## 2026-10-10 — videoDuration 수집 추가 + 루프 감사 (유지율 분모 누락 해소)
 
 - 배경(사용자 지적): 유지율이 전부 빈칸. 원인 — 수집 항목에 영상 길이(`videoDuration`)가 없어 평균시청률 분모가 없음. 처음부터 넣었어야 할 것.
