@@ -4,6 +4,15 @@
 
 ---
 
+## 2026-10-14 — edge-tts 7.2.8 → 7.3.1 업그레이드 (403 WSServerHandshakeError 해소)
+
+- 배경: 10/10경 MS가 `Sec-MS-GEC v2` 토큰 강제 → `7.2.8`(v1 토큰)이 전지역 403으로 거부됨(`rany2/edge-tts#490`). 로컬은 `tts_generator.py` gTTS 폴백으로 우회 중이었으나 음질 저하.
+- 수정: `requirements.txt`만 변경 — `edge-tts==7.2.8` → `==7.3.1` (10/13 릴리스, `PR #492` v2 토큰 포함). `Communicate(text/voice/rate/pitch)` 시그니처 동일이라 `tts_generator.py` 무변경, gTTS 폴백은 안전망으로 유지. GitHub 워크플로 4종 모두 `pip install -r requirements.txt`라 Actions도 동일 해결 (setup-python pip 캐시는 requirements 해시 기준이라 자동 무효화).
+- 검증: `py_compile`(tts_generator/config_loader) 통과 + requirements 핀 확인 + `config.yml` tts 섹션 파싱 확인. 외부 API 호출 없음 (실음성 합성 테스트는 다음 Actions 실행에서 확인).
+- ROADMAP 변경 없음 (의존성 패치라 기능 로드맵 해당 항목 없음).
+
+---
+
 ## 2026-10-12 — Gemini 모델 순서 갱신 (3.8-flash 주력)
 
 - 배경(사용자 확인): 키로 조회한 사용가능 모델 목록에 `gemini-3.8-flash`, `gemini-3.7-flash`가 새로 확인됨. 기존 주력 `3.6-flash`보다 최신.
