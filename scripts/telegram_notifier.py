@@ -119,10 +119,13 @@ class TelegramNotifier:
         if script_data:
             comment_seed = (script_data.get('comment_cta') or '').strip()
             if comment_seed:
-                self._send_message(
-                    f"{comment_seed}",
-                    parse_mode=None)
-                logger.info("첫 댓글용 문구 전송 완료")
+                time.sleep(1)  # 직전 메시지 연속 전송으로 인한 스로틀링 방지
+                if self._send_message(f"{comment_seed}", parse_mode=None, max_attempts=2):
+                    logger.info("첫 댓글용 문구 전송 완료")
+                else:
+                    logger.error("첫 댓글용 문구 전송 실패 (재시도 1회 완료, 수동 확인 필요)")
+            else:
+                logger.warning("첫 댓글용 문구 없음 (comment_cta 비어 있음)")
         
         # ③ 영상 파일 전송 (옵션)
         if (video_path and Path(video_path).exists() 
@@ -197,46 +200,60 @@ class TelegramNotifier:
             return False
         return self._send_message(message)
     
-    def _send_message(self, text, parse_mode='HTML'):
+    def _send_message(self, text, parse_mode='HTML', max_attempts=1):
         """
-        텍스트 메시지 전송
+        텍스트 메시지 전송 (네트워크 오류 시 재시도 지원)
         
         Args:
             text: 메시지 텍스트
             parse_mode: 'HTML', 'Markdown', 또는 None (SNS 캡션은 None 권장)
+            max_attempts: 네트워크 오류 시 최대 시도 횟수 (기본 1 = 재시도 없음)
         """
-        try:
-            max_len = 4096
-            if len(text) > max_len:
-                text = text[:max_len - 3] + "..."
-            
-            url = f"{self.base_url}/sendMessage"
-            payload = {
-                'chat_id': self.chat_id,
-                'text': text,
-                'disable_web_page_preview': True,
-            }
-            
-            if parse_mode:
-                payload['parse_mode'] = parse_mode
-            
-            response = requests.post(url, json=payload, timeout=30)
-            
-            if response.status_code == 200:
-                logger.info("텔레그램 메시지 전송 성공")
-                return True
-            else:
+        max_len = 4096
+        if len(text) > max_len:
+            text = text[:max_len - 3] + "..."
+        
+        url = f"{self.base_url}/sendMessage"
+        payload = {
+            'chat_id': self.chat_id,
+            'text': text,
+            'disable_web_page_preview': True,
+        }
+        
+        if parse_mode:
+            payload['parse_mode'] = parse_mode
+        
+        max_attempts = max(1, max_attempts)
+        
+        for attempt in range(1, max_attempts + 1):
+            try:
+                response = requests.post(url, json=payload, timeout=30)
+                
+                if response.status_code == 200:
+                    logger.info("텔레그램 메시지 전송 성공")
+                    return True
+                
+                # HTTP 오류(4xx/5xx)는 재시도하지 않음 (400 HTML만 plain text 폴백)
                 if parse_mode == 'HTML' and response.status_code == 400:
                     logger.warning("HTML 파싱 실패, plain text로 재시도")
-                    return self._send_message(text, parse_mode=None)
+                    return self._send_message(text, parse_mode=None, max_attempts=max_attempts)
                 
                 logger.error(f"텔레그램 메시지 전송 실패: {response.status_code}")
                 logger.error(response.text)
                 return False
                 
-        except Exception as e:
-            logger.error(f"텔레그램 전송 오류: {e}")
-            return False
+            except requests.exceptions.RequestException as req_err:
+                # RemoteDisconnected 등 네트워크 오류만 재시도
+                if attempt < max_attempts:
+                    logger.warning(f"텔레그램 전송 네트워크 오류 ({attempt}/{max_attempts}): {req_err}")
+                    logger.info("3초 후 텍스트 전송을 1회 재시도합니다...")
+                    time.sleep(3)
+                    continue
+                logger.error(f"텔레그램 전송 오류: {req_err}")
+                return False
+            except Exception as e:
+                logger.error(f"텔레그램 전송 오류: {e}")
+                return False
     
     def _send_video(self, video_path, caption=""):
         """영상 파일 전송 (1회 재시도 포함)"""

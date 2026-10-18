@@ -4,6 +4,15 @@
 
 ---
 
+## 2026-10-18 — 텔레그램 첫댓글 문구 누락 수정 (전송 실패 무음 처리)
+
+- 배경(사용자 지적·Actions 로그 확인): 10-18 예약분(말실수 사과, `4n1hrkffOg0`) 텔레그램 첫댓글 문구 누락. 로그상 메인→인스타→틱톡 연속 전송 직후 댓글 `sendMessage`에서 `RemoteDisconnected` 발생 → `_send_message`는 False를 반환했는데 호출부가 반환값을 무시하고 "첫 댓글용 문구 전송 완료"로 오기록. 텍스트 전송엔 재시도가 없었음(영상만 1회).
+- 수정: `telegram_notifier.py` — ① `_send_message(max_attempts)` 파라미터 추가, 네트워크 오류(`RequestException`) 한정 3초 백오프 재시도(HTTP 오류는 재시도 안 함) ② 댓글 문구는 `max_attempts=2` + 성공/실패 로그 분리, `comment_cta` 빈값이면 경고 로그 ③ 댓글 전송 전 `sleep(1)`로 연속 전송(스로틀링) 방지.
+- 검증: `py_compile` 통과 + mock 5케이스(재시도 성공 / 2회 실패 로깅 정확성 / 기본 무재시도 회귀 방지 / HTML 400 폴백 유지 / 빈값 경고) 전부 통과. 외부 API 호출 없음.
+- ROADMAP 49 반영.
+
+---
+
 ## 2026-10-14 — edge-tts 7.2.8 → 7.3.1 업그레이드 (403 WSServerHandshakeError 해소)
 
 - 배경: 10/10경 MS가 `Sec-MS-GEC v2` 토큰 강제 → `7.2.8`(v1 토큰)이 전지역 403으로 거부됨(`rany2/edge-tts#490`). 로컬은 `tts_generator.py` gTTS 폴백으로 우회 중이었으나 음질 저하.
