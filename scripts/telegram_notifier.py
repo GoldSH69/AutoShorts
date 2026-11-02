@@ -10,6 +10,7 @@ import time
 import requests
 from pathlib import Path
 from utils import logger, get_env, get_today_str, get_weekday_name_ko, build_youtube_title
+from topic_inventory import get_topic_inventory
 
 # ─── 블로그 홍보 문구 ───
 BLOG_FOOTER_TELEGRAM = "\n🧠 Insight Retreat — 심리 · 운세 · 생활정보 · AI\n👉 https://mindground.org"
@@ -52,11 +53,19 @@ class TelegramNotifier:
         thumbnail_hook = script_data.get('thumbnail_hook', '설정 없음') if script_data else '설정 없음'
         thumbnail_hook = ' '.join(str(thumbnail_hook).split())
         
-        # 남은 주제 개수 계산 및 경고 추가
-        remaining = 30 - no
+        # 남은 주제 개수 계산 및 경고 추가 (하드코딩 30 - no 금지)
         warning_line = ""
-        if remaining <= 3:
-            warning_line = f"\n⚠️ 경고: [{category_name}] 남은 주제가 {remaining}개뿐입니다. (주제 충전 필요!)\n"
+        try:
+            category_id = self.config.get_category_id(weekday)
+            total, used, remaining = get_topic_inventory(category_id)
+        except Exception as e:
+            logger.warning(f"주제 재고 계산 실패: {e}")
+            total, used, remaining = 0, 0, 0
+        if total and remaining <= 3:
+            warning_line = (
+                f"\n⚠️ 경고: [{category_name}] 남은 주제 {remaining}개 / "
+                f"전체 {total}개 (사용 {used}개) — 주제 충전 필요!\n"
+            )
         
         # 업로드 상태
         if upload_result and upload_result.get('video_id'):

@@ -12,6 +12,7 @@ from utils import (
     logger, get_project_root, get_env, safe_json_loads,
     read_file, read_json, write_json, get_today_str, get_weekday, generate_hash
 )
+from topic_inventory import get_topic_inventory
 
 try:
     import google.generativeai as genai
@@ -37,6 +38,9 @@ BLOG_FOOTER_TIKTOK = "🧠 더 많은 심리학 콘텐츠 → 프로필 링크!"
 # ─── 스크립트 글자수 기준 ───
 SCRIPT_MIN_CHARS = 260
 SCRIPT_MAX_CHARS = 320
+# 제목: 한글 본문 30자 + 영어 검색용 괄호 1개, 전체 45자 이내
+TITLE_BODY_MAX_CHARS = 30
+TITLE_MAX_CHARS = 45
 
 # ─── 카테고리별 소재 목록 삭제됨 (config/topics.json 참조) ───
 
@@ -190,10 +194,11 @@ SNS 캡션 규칙:
 반드시 아래 JSON 형식으로만 출력하세요. 해시태그는 반드시 배열(리스트)로 출력하세요.
 
 {{
-  "title": "영상 제목 (40자 이내, 앞 15자 안에 핵심 한글 검색어 1개 필수. 이모지·채널명·일본어 금지. 영어는 본문 근거용어와 일치하는 관련 심리학/뇌과학 용어일 때만 맨 뒤 (괄호) 1개, 없으면 생략. (Psychology)(Self)(Love)(Brain) 같은 범용어·카테고리명 금지)",
-  "hook": "첫 3초 후킹 문장",
+  "title": "영상 제목 (한글 본문 15~30자 + 영어 검색용 괄호 1개, 전체 45자 이내. 앞 15자 안에 핵심 한글 검색어 1개 필수. 이모지·채널명·일본어 금지. 영어는 본문 근거용어와 일치하는 관련 심리학/뇌과학 용어일 때만 맨 뒤 (괄호) 1개 유지 — 영어 검색 유입용. (Psychology)(Self)(Love)(Brain) 같은 범용어·카테고리명 금지)",
+  "hook": "첫 2초 후킹 문장 (15자 이내, 인사·배경 설명 금지, 인물/행동/인용으로 즉시 시작)",
   "body": "본문 내용",
   "cta": "마무리 CTA",
+  "comment_cta": "고정댓글용 2지선다 질문 1문장 (예: '당신은 참는 쪽? 바로 말하는 쪽?', full_script에 덧붙이지 말 것)",
   "full_script": "전체 나레이션 (hook+body+cta를 자연스럽게 연결)",
   "description": "유튜브 설명 50자 이내",
   "search_keywords": ["영어키워드1", "영어키워드2", "영어키워드3"],
@@ -284,6 +289,15 @@ SNS 캡션 규칙:
         if not category_topics:
             logger.warning(f"  카테고리 '{category_id}'의 순차 주제 목록이 없습니다.")
             return 1, "자유 주제", "자유 주제 후킹"
+
+        # 실제 재고(전체/사용/남음)를 로그로 남긴다. 카테고리 총량은 하드코딩하지 않는다.
+        try:
+            total, used, remaining = get_topic_inventory(category_id)
+            logger.info(f"  주제 재고: {remaining}/{total} 남음 (사용 {used})")
+            if remaining <= 3:
+                logger.warning(f"  ⚠️ 주제 재고 부족: [{category_id}] {remaining}개 남음")
+        except Exception as e:
+            logger.warning(f"  주제 재고 계산 실패: {e}")
 
         # 히스토리 로드 및 해당 카테고리 최신 이력 탐색
         history = self._load_history()
@@ -757,7 +771,8 @@ SNS 캡션 규칙:
             "   - 예: '주변에 이런 습관이 있는 친구에게 공유해보세요!'\n"
             "   - 댓글형은 \"선택 질문 + 이유 한 줄 요청\" 2단 구조를 한 호흡으로 담으세요(2문장 연타 금지).\n"
             "   - \"cta\" 필드에는 full_script의 마지막 문장을 그대로 복사해서 담아주세요. (독립 생성 금지)\n"
-            "   - \"comment_cta\" 필드에는 고정댓글/설명용 질문 1문장을 담아주세요. 이 문장은 full_script에 덧붙이지 마세요.\n"
+            "   - \"comment_cta\" 필드에는 고정댓글용 2지선다 질문 1문장을 담아주세요. 예: '당신은 참는 쪽? 바로 말하는 쪽?' 이유 설명을 요구하지 마세요(초기 댓글 진입장벽). 이 문장은 full_script에 덧붙이지 마세요.\n"
+            "   - hook은 첫 2초 안에 끝나는 15자 이내 1문장으로 쓰고, 인사·배경 설명 없이 인물/행동/인용으로 즉시 시작하세요.\n"
             "   - ⚠️ 중요: 맨 끝에서 갑자기 뜬금없이 튀어나오는 문장이 아니라, 해결책 설명의 결론과 자연스럽게 매끄럽게 연결되도록 문맥을 이어주세요."
         )
 
@@ -964,6 +979,19 @@ SNS 캡션 규칙:
         if not title or len(title) < 2:
             logger.warning(f"검증 실패: title 없음")
             return False
+
+        # 영어 괄호는 검색 유입용으로 유지한다. 한글 본문/전체 길이만 경고한다.
+        # 문맥 손상을 막기 위해 자동 절단은 하지 않고, 초과 시 로그로 추적한다.
+        m_en = re.search(r'\s*\(([A-Za-z][^()]*)\)\s*$', title)
+        title_body = title[:m_en.start()].rstrip() if m_en else title
+        if len(title_body) > TITLE_BODY_MAX_CHARS:
+            logger.warning(
+                f"  ⚠️ 제목 본문 {len(title_body)}자 > {TITLE_BODY_MAX_CHARS}자: '{title_body}'"
+            )
+        if len(title) > TITLE_MAX_CHARS:
+            logger.warning(
+                f"  ⚠️ 제목 전체 {len(title)}자 > {TITLE_MAX_CHARS}자: '{title}'"
+            )
         
         # full_script 복구
         script = data.get('full_script', '')

@@ -107,13 +107,14 @@ def build_report(history_path, performance_path, topics_path, now=None):
         f"{c} 평균 {sum(v) // len(v):,}회" for c, v in sorted(cats.items()))
     lines.append(f"📂 {cat_line}")
 
-    # 경고: 최근 3편 평균이 직전 3편 절반 이하 → 노출 하락
+    # 경고: 최근 3편 평균 조회수가 직전 3편의 절반 이하 → 조회수 하락
+    # (impressions/노출 데이터가 아니므로 '노출 하락'으로 표기하지 않는다)
     by_date = sorted(rows, key=lambda r: r["date"], reverse=True)
     if len(by_date) >= 4:
         recent = sum(r["views"] for r in by_date[:3]) / 3
         prev = sum(r["views"] for r in by_date[3:6]) / max(1, len(by_date[3:6]))
         if prev > 0 and recent < prev / 2:
-            lines.append("⚠️ 노출 하락 (최근 3편 평균이 직전 절반 이하)")
+            lines.append("⚠️ 조회수 하락 (최근 3편 평균이 직전 절반 이하)")
     # 경고: 댓글 0이 3편 연속 → 참여 저조
     if len(by_date) >= 3 and all(r["comments"] == 0 for r in by_date[:3]):
         lines.append("⚠️ 참여 저조 (댓글 0이 3편 연속)")

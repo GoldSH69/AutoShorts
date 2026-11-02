@@ -302,6 +302,10 @@ def main():
                 t.get("date", ""), scheduling_time).strftime("%Y-%m-%d %H:%M")
             e["window_start"] = str(t.get("date", ""))
             e["window_end"] = now.strftime("%Y-%m-%d")
+            # 성과 JSON만 봐도 제목/카테고리/주제 번호를 바로 분석할 수 있게 저장
+            e["title"] = t.get("title", "")
+            e["category"] = t.get("category", "")
+            e["topic_no"] = t.get("no")
             entries.append(e)
         except Exception as e:
             logger.warning(f"  수집 실패 {t.get('video_id')}: {e}")

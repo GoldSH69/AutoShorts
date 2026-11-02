@@ -4,6 +4,16 @@
 
 ---
 
+## 2026-11-02 — 주제·제목·훅·편성 고도화 (관계/연애 중심)
+
+- 배경(사용자 승인·월간 성적표): 최근 30일 relationship 평균 199회·love 165회 > brain 50·dark 31. 제목 영어괄호 23건 6.5/일 vs 없음 16건 10.5/일, ≤30자 10.9 vs >45자 4.7. 단 relationship no.25 `(Dunbar's Number)` 40/일은 예외. 2026 Shorts는 완주율·첫 1~2초·시리즈가 중요.
+- 결정: 영어 괄호는 영어 검색 유입용으로 유지. 제목=한글 본문 15~30자+관련 영어 괄호 1개, 전체 45자. 범용어 `(Psychology)(Self)(Love)(Brain)`만 제거. 4주안은 별도 대기 없이 즉시 적용.
+- 수정: 프롬프트 7종(제목/첫 2초 훅/2지선다 고정댓글/타임코드), `config/topics.json` 12건(relationship 29~35, love 27~29·38, dark 35), `config/config.yml` 편성 relationship 3·love 2·dark 1·brain 1 및 해시태그. `script_generator.py` 실제 재고 로그·제목 길이 경고·CTA 지침, `topic_inventory.py` 신규, `telegram_notifier.py` `30-no` 제거, `analytics_collector.py` title/category/topic_no 저장, `monthly_report.py` `노출 하락`→`조회수 하락`.
+- 검증: `py_compile` 5개 통과, JSON 7카테고리 개수·no 연속성, YAML 편성/해시태그, 재고 relationship 59/87·love 61/87·dark 60/87·brain 30/51, 월간·수집 드라이런(외부 API 호출 없음).
+- 후속: push 후 최신 main에서 새 `workflow_dispatch` 실행. 실제 리텐션·유지율 검증은 다음 성과 수집 이후.
+
+---
+
 ## 2026-11-02 — 워크플로 폰트 설치 스텝 제거 (ubuntu-latest 26.04 전환 대응)
 
 - 배경(사용자 제보·Actions 로그): `sudo apt-get install -y -qq fonts-nanum fonts-nanum-coding`에서 `E: Unable to locate package fonts-nanum-coding`으로 job 실패. 워크플로 파일은 10-03 이후 무변경인데, GitHub가 `ubuntu-latest`를 24.04 → 26.04로 순차 전환(2026-10-19~11-19)하면서 러너 OS가 바뀐 것이 원인. 26.04에서는 transitional 패키지 `fonts-nanum-coding`이 제거됨(24.04에는 잔존). apt는 복수 패키지 중 하나라도 못 찾으면 exit 100으로 전체 실패.
