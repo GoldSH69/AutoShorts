@@ -90,11 +90,6 @@ jobs:
           which ffmpeg && which ffprobe
           echo "✅ FFmpeg OK"
 
-      - name: 🔤 Install fonts
-        run: |
-          sudo apt-get install -y -qq fonts-nanum fonts-nanum-coding
-          fc-cache -fv
-
       - name: 📁 Prepare
         run: mkdir -p output history
 

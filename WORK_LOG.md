@@ -4,6 +4,14 @@
 
 ---
 
+## 2026-11-02 — 워크플로 폰트 설치 스텝 제거 (ubuntu-latest 26.04 전환 대응)
+
+- 배경(사용자 제보·Actions 로그): `sudo apt-get install -y -qq fonts-nanum fonts-nanum-coding`에서 `E: Unable to locate package fonts-nanum-coding`으로 job 실패. 워크플로 파일은 10-03 이후 무변경인데, GitHub가 `ubuntu-latest`를 24.04 → 26.04로 순차 전환(2026-10-19~11-19)하면서 러너 OS가 바뀐 것이 원인. 26.04에서는 transitional 패키지 `fonts-nanum-coding`이 제거됨(24.04에는 잔존). apt는 복수 패키지 중 하나라도 못 찾으면 exit 100으로 전체 실패.
+- 수정: `daily-short-ko.yml`, `manual-trigger.yml`에서 폰트 설치 스텝 삭제. 실제 자막 폰트는 Pretendard이며 `assets/fonts/Pretendard-*.ttf` 번들 + `video_composer.py`의 `fontsdir` 직접 지정으로 시스템 폰트에 의존하지 않음(`config.yml` `font_name: Pretendard`). FFmpeg 설치는 유지.
+- 검증: 두 워크플로 YAML 파싱 통과 + 폰트 참조 잔존 없음 확인. 외부 API 호출 없음.
+
+---
+
 ## 2026-10-18 — 텔레그램 첫댓글 문구 누락 수정 (전송 실패 무음 처리)
 
 - 배경(사용자 지적·Actions 로그 확인): 10-18 예약분(말실수 사과, `4n1hrkffOg0`) 텔레그램 첫댓글 문구 누락. 로그상 메인→인스타→틱톡 연속 전송 직후 댓글 `sendMessage`에서 `RemoteDisconnected` 발생 → `_send_message`는 False를 반환했는데 호출부가 반환값을 무시하고 "첫 댓글용 문구 전송 완료"로 오기록. 텍스트 전송엔 재시도가 없었음(영상만 1회).

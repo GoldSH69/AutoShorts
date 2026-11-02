@@ -79,12 +79,6 @@ jobs:
           which ffmpeg && which ffprobe
           echo "✅ FFmpeg OK"
 
-      - name: 🔤 Install Korean fonts
-        run: |
-          sudo apt-get install -y -qq fonts-nanum fonts-nanum-coding
-          fc-cache -fv
-          echo "✅ 한글 폰트 설치 완료"
-
       - name: 📁 Prepare directories
         run: |
           mkdir -p output
