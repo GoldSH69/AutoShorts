@@ -88,6 +88,9 @@ class Config:
     def get_gemini_retry_count(self):
         return self.get('gemini', 'retry_count', default=3)
     
+    def get_gemini_request_timeout(self):
+        return self.get('gemini', 'request_timeout', default=180)
+    
         # ─── TTS ───
     def get_tts_config(self, language='ko'):
         base = self.get('tts', default={})

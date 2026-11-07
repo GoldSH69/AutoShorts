@@ -160,6 +160,9 @@
 ### 50. 주제·제목·훅·편성 고도화 (2026-11)
 * **내용**: 월간 성적표·2026 Shorts 트렌드 기반으로 프롬프트 7종(제목 45자·첫 2초 훅·2지선다 고정댓글), 주제 12건(relationship 29~35, love 27~29·38, dark 35), 편성 relationship 3·love 2·dark 1·brain 1, 해시태그 보강. `topic_inventory.py` 신규로 실제 재고 계산, 텔레그램 `30-no` 하드코딩 제거, 성과 엔트리에 title/category/topic_no 저장, 월간 경고 문구 `조회수 하락` 정정. 영어 괄호는 검색 유입용으로 유지.
 
+### 51. Gemini 요청 타임아웃 추가 (504 장시간 대기 해소)
+* **내용**: `gemini-3.8-flash` 호출이 SDK 기본 600초까지 대기 후 `504 Deadline Exceeded`로 실패, 재시도·텍스트 모드까지 반복되어 폴백이 지연되던 문제. `config.yml`에 `request_timeout: 180` 신설, `config_loader.py` getter 추가, `script_generator.py` `_generate_content()`로 모든 호출에 `request_options={'timeout': ...}` 적용. 미지원 SDK는 옵션 없이 자동 폴백. Mock 오프라인 검증 완료.
+
 ---
 
 ## 🟨 향후 개선 아이디어 (Future Ideas)

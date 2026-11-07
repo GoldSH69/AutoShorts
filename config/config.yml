@@ -147,6 +147,7 @@ gemini:
   thinking_budget: 2048            # thinking 모델용 (2.5-flash 백업 시)
   retry_count: 2
   retry_delay: 10
+  request_timeout: 180           # 1회 API 요청 타임아웃(초). 초과 시 다음 시도/모델로 폴백
 
 # ─── TTS ───
 # ─── TTS ───

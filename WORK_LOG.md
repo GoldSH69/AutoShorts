@@ -4,6 +4,14 @@
 
 ---
 
+## 2026-11-07 — Gemini 요청 타임아웃 추가 (504 Deadline Exceeded 장시간 대기 해소)
+
+- 배경(사용자 제보·실행 로그): `gemini-3.8-flash` 호출이 `22:12:23 → 22:22:23` 정확히 600초 후 `504 Deadline Exceeded`. `generate_content`에 타임아웃을 지정하지 않아 SDK 기본값(600초)까지 대기했고, 모델별 재시도 2회 + 텍스트 모드 재시도까지 반복되어 주력 모델 하나에서 최대 30~40분을 소모한 뒤에야 폴백.
+- 수정: `config/config.yml` gemini에 `request_timeout: 180` 추가, `config_loader.py`에 `get_gemini_request_timeout()` 추가, `script_generator.py`에 `_generate_content()` 헬퍼 신설 후 `_call_gemini`·`_call_gemini_simple`에서 `request_options={'timeout': ...}` 적용. `request_options` 미지원 구버전 SDK면 경고 후 옵션 없이 자동 폴백.
+- 검증: `py_compile` 2개 통과, Mock 기반 오프라인 테스트(타임아웃 전달/미지원 SDK 폴백/기타 TypeError 전파/플래그 캐시) 통과. 외부 API 호출 없음.
+
+---
+
 ## 2026-11-02 — 주제·제목·훅·편성 고도화 (관계/연애 중심)
 
 - 배경(사용자 승인·월간 성적표): 최근 30일 relationship 평균 199회·love 165회 > brain 50·dark 31. 제목 영어괄호 23건 6.5/일 vs 없음 16건 10.5/일, ≤30자 10.9 vs >45자 4.7. 단 relationship no.25 `(Dunbar's Number)` 40/일은 예외. 2026 Shorts는 완주율·첫 1~2초·시리즈가 중요.

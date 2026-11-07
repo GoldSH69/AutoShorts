@@ -112,6 +112,8 @@ class ScriptGenerator:
         self.temperature = config.get_gemini_temperature()
         self.max_tokens = config.get_gemini_max_tokens()
         self.retry_count = config.get_gemini_retry_count()
+        self.request_timeout = config.get_gemini_request_timeout()
+        self._timeout_option_unsupported = False
         self.thinking_budget = config.get('gemini', 'thinking_budget', default=2048)
         
         self.project_root = get_project_root()
@@ -399,6 +401,23 @@ SNS 캡션 규칙:
         
     # ─── Gemini API 호출 ───
     
+    def _generate_content(self, model, prompt):
+        """request_timeout을 적용해 generate_content 호출 (미지원 SDK면 옵션 없이 폴백)"""
+        if not self._timeout_option_unsupported:
+            try:
+                return model.generate_content(
+                    prompt,
+                    request_options={'timeout': self.request_timeout},
+                )
+            except TypeError as e:
+                msg = str(e).lower()
+                if 'request_options' in msg or 'unexpected keyword' in msg:
+                    logger.warning("  request_options 미지원 SDK, 타임아웃 없이 호출")
+                    self._timeout_option_unsupported = True
+                else:
+                    raise
+        return model.generate_content(prompt)
+    
     def _call_gemini(self, prompt, model_name, use_json_mode=True):
         """Gemini API 호출 (모델에 따라 자동 최적화)"""
         thinking = is_thinking_model(model_name)
@@ -430,7 +449,7 @@ SNS 캡션 규칙:
                 generation_config=gen_config,
             )
             
-            response = model.generate_content(prompt)
+            response = self._generate_content(model, prompt)
             
             text = None
             
@@ -501,7 +520,7 @@ SNS 캡션 규칙:
                 gen_config['response_mime_type'] = 'application/json'
             
             model = genai.GenerativeModel(model_name, generation_config=gen_config)
-            response = model.generate_content(prompt)
+            response = self._generate_content(model, prompt)
             
             if response and response.text:
                 logger.info(f"  ✅ 심플 모드 응답: {len(response.text)}자")
