@@ -128,26 +128,30 @@ categories:
 
 # ─── Gemini API ───
 gemini:
-  # 주력 모델
-  model: "gemini-3.8-flash"
+  # 주력 모델 (2026-11 확인: 무료 티어 제공, 3.8 Flash의 공식 권장 업그레이드)
+  model: "gemini-4-hydrogen"
   
-  # 백업 모델 (순서대로 시도)
+  # 백업 모델 (순서대로 시도) — 무료 티어 확인된 모델만
   fallback_models:
-    - "gemini-3.7-flash"
+    - "gemini-3.8-flash"
     - "gemini-3.6-flash"
     - "gemini-3.5-flash-lite"
   
-  # 사용 불가 모델 (참고용 메모)
-  # - gemini-1.5-flash: 목록에서 삭제됨
-  # - gemini-1.5-flash-latest: 목록에서 삭제됨
-  # - gemini-2.0-flash: 무료 할당량 0 (불안정)
+  # 체인에서 제외한 모델 (참고 메모)
+  # - gemini-3.7-flash: 무료 티어 확인 안 됨 (유료 전용 가능)
+  # - gemini-3.5-flash: 무료 티어 확인 안 됨
+  # - gemini-3.1-flash-lite: 무료지만 품질 우선순위에서 제외
+  # - gemini-4-argon / gemini-4-carbon: 유료 전용
+  # - gemini-*-latest: 모델이 조용히 교체되어 재현성 훼손
+  # - gemini-1.5-flash / gemini-2.0-flash: 목록에서 삭제됨
   
-  temperature: 0.9
-  max_output_tokens: 8192          # 충분한 응답 공간
-  thinking_budget: 2048            # thinking 모델용 (2.5-flash 백업 시)
+  max_output_tokens: 16384         # thinking 토큰 포함 캡 (8192는 잘릴 위험)
+  thinking_level: "low"            # Gemini 4 전용: low|medium|high|xhigh (minimal 금지)
+  thinking_budget: 2048            # 2.5 계열 전용 (현 체인 미사용)
   retry_count: 2
   retry_delay: 10
   request_timeout: 180           # 1회 API 요청 타임아웃(초). 초과 시 다음 시도/모델로 폴백
+  max_total_seconds: 900         # 전체 모델 시도 예산(초). 초과 시 즉시 중단
 
 # ─── TTS ───
 # ─── TTS ───

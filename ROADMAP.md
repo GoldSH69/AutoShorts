@@ -163,6 +163,9 @@
 ### 51. Gemini 요청 타임아웃 추가 (504 장시간 대기 해소)
 * **내용**: `gemini-3.8-flash` 호출이 SDK 기본 600초까지 대기 후 `504 Deadline Exceeded`로 실패, 재시도·텍스트 모드까지 반복되어 폴백이 지연되던 문제. `config.yml`에 `request_timeout: 180` 신설, `config_loader.py` getter 추가, `script_generator.py` `_generate_content()`로 모든 호출에 `request_options={'timeout': ...}` 적용. 미지원 SDK는 옵션 없이 자동 폴백. Mock 오프라인 검증 완료.
 
+### 52. Gemini 4 Hydrogen 전환 + 무료 모델 조회 도구 (2026-11-16)
+* **내용**: `gemini-4-hydrogen`(무료 티어, 3.8 Flash 권장 업그레이드) 주력 전환. 폴백은 `3.8-flash → 3.6-flash → 3.5-flash-lite` 총 4개 체인으로 축소하고 무료 미확인 `3.7-flash`·preview·`-latest`·gemma·유료 4-argon/carbon 제외. `thinking_level: low`, `max_output_tokens 16384`, `max_total_seconds 900` 적용, 401/403/404/429는 재시도 없이 즉시 다음 모델로. 키 입력형 모델 조회 도구 `scripts/list_gemini_models.py` 신규(무료 여부 문서 기준 표기, `--verify` 접근 확인).
+
 ---
 
 ## 🟨 향후 개선 아이디어 (Future Ideas)

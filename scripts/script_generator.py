@@ -44,11 +44,14 @@ TITLE_MAX_CHARS = 45
 
 # ─── 카테고리별 소재 목록 삭제됨 (config/topics.json 참조) ───
 
-# thinking 모델 판별
+# thinking 모델 판별 (2.5 계열: thinking_budget)
 THINKING_MODELS = {
     'gemini-2.5-flash',
     'gemini-2.5-pro',
 }
+
+# Gemini 4 시리즈: thinking_level(low/medium/high/xhigh) 사용
+GEMINI4_PREFIX = 'gemini-4'
 
 # 인스타/틱톡에서 제거할 플랫폼/채널 전용 태그 (소문자 비교)
 PLATFORM_TAGS_TO_REMOVE = {
@@ -98,6 +101,11 @@ def is_thinking_model(model_name):
     return False
 
 
+def is_gemini4_model(model_name):
+    """Gemini 4 시리즈 여부 (thinking_level 사용)"""
+    return model_name.lower().replace('models/', '').startswith(GEMINI4_PREFIX)
+
+
 class ScriptGenerator:
     """Gemini 스크립트 생성기 v6.3 - SNS 캡션 해시태그 완전 제거"""
     
@@ -109,12 +117,16 @@ class ScriptGenerator:
         
         self.model_name = config.get_gemini_model()
         self.fallback_models = config.get_gemini_fallback_models()
-        self.temperature = config.get_gemini_temperature()
         self.max_tokens = config.get_gemini_max_tokens()
         self.retry_count = config.get_gemini_retry_count()
         self.request_timeout = config.get_gemini_request_timeout()
         self._timeout_option_unsupported = False
         self.thinking_budget = config.get('gemini', 'thinking_budget', default=2048)
+        self.thinking_level = config.get('gemini', 'thinking_level', default='low')
+        self.max_total_seconds = config.get('gemini', 'max_total_seconds', default=900)
+        # 마지막 호출 실패 성격 (True=재시도 무의미: 401/403/404/429)
+        self.last_error_hard = False
+        self.last_error_reason = ''
         
         self.project_root = get_project_root()
         
@@ -126,11 +138,30 @@ class ScriptGenerator:
             self.topics_data = {}
             
         logger.info(f"ScriptGenerator v6.3 초기화 (요일별 순차 처리 적용)")
-        logger.info(f"  주력 모델: {self.model_name} (thinking: {is_thinking_model(self.model_name)})")
+        logger.info(f"  주력 모델: {self.model_name} ({self._model_mode_label(self.model_name)})")
         logger.info(f"  백업 모델: {self.fallback_models}")
         logger.info(f"  max_output_tokens: {self.max_tokens}")
+        logger.info(f"  thinking_level: {self.thinking_level} / 전체 시도 예산: {self.max_total_seconds}초")
         logger.info(f"  인스타 해시태그 제한: {INSTAGRAM_HASHTAG_LIMIT}개")
         logger.info(f"  틱톡 해시태그 제한: {TIKTOK_HASHTAG_LIMIT}개")
+
+    @staticmethod
+    def _model_mode_label(model_name):
+        """모델 세대별 thinking 설정 방식"""
+        if is_gemini4_model(model_name):
+            return 'thinking_level'
+        if is_thinking_model(model_name):
+            return 'thinking_budget'
+        return '기본'
+
+    def _budget_exceeded(self, started_at):
+        """전체 모델 시도 예산(초) 초과 여부"""
+        return (time.monotonic() - started_at) > self.max_total_seconds
+
+    def _mark_hard_fail(self, reason):
+        """재시도해도 결과가 바뀌지 않는 실패 표시"""
+        self.last_error_hard = True
+        self.last_error_reason = reason
     
     # ─── 프롬프트 ───
     
@@ -419,46 +450,50 @@ SNS 캡션 규칙:
         return model.generate_content(prompt)
     
     def _call_gemini(self, prompt, model_name, use_json_mode=True):
-        """Gemini API 호출 (모델에 따라 자동 최적화)"""
+        """Gemini API 호출 (모델 세대별 파라미터 자동 조정)"""
         thinking = is_thinking_model(model_name)
-        
+        gemini4 = is_gemini4_model(model_name)
+        self.last_error_hard = False
+        self.last_error_reason = ''
+
         try:
+            # Gemini 4/3 시리즈는 temperature 미지원(서버 무시)이므로 전송하지 않는다
             gen_config = {
-                'temperature': self.temperature,
                 'max_output_tokens': self.max_tokens,
             }
-            
+
             if use_json_mode:
                 gen_config['response_mime_type'] = 'application/json'
-            
-            if thinking:
-                try:
-                    gen_config['thinking_config'] = {
-                        'thinking_budget': self.thinking_budget
-                    }
-                    logger.info(f"  thinking 모델, budget={self.thinking_budget}")
-                except Exception:
-                    logger.warning(f"  thinking_config 미지원, 기본 설정 사용")
-            
+
+            if gemini4:
+                # Gemini 4: thinking_level(low/medium/high/xhigh). 기본 high → 명시값 사용
+                gen_config['thinking_config'] = {'thinking_level': self.thinking_level}
+                logger.info(f"  thinking_level={self.thinking_level}")
+            elif thinking:
+                gen_config['thinking_config'] = {
+                    'thinking_budget': self.thinking_budget
+                }
+                logger.info(f"  thinking 모델, budget={self.thinking_budget}")
+
             mode_str = "JSON" if use_json_mode else "텍스트"
-            think_str = "+thinking" if thinking else ""
+            think_str = "+thinking" if (thinking or gemini4) else ""
             logger.info(f"  호출: {model_name} [{mode_str}{think_str}]")
-            
+
             model = genai.GenerativeModel(
                 model_name,
                 generation_config=gen_config,
             )
-            
+
             response = self._generate_content(model, prompt)
-            
+
             text = None
-            
+
             try:
                 if response and response.text:
                     text = response.text
             except Exception:
                 pass
-            
+
             if not text:
                 try:
                     if response and response.candidates:
@@ -474,7 +509,7 @@ SNS 캡션 규칙:
                                 break
                 except Exception as e:
                     logger.warning(f"  candidates 추출 실패: {e}")
-            
+
             if text:
                 logger.info(f"  ✅ 응답 수신: {len(text)}자")
                 logger.info(f"  미리보기: {text[:150]}...")
@@ -489,48 +524,66 @@ SNS 캡션 규칙:
                 except Exception:
                     pass
                 return None
-            
+
         except Exception as e:
             error_str = str(e)
-            
+            lower = error_str.lower()
+
+            # 재시도해도 결과가 바뀌지 않는 오류 → 다음 모델로 즉시 이동
             if '429' in error_str:
-                logger.error(f"  ❌ 할당량 초과 ({model_name})")
-            elif '404' in error_str or 'not found' in error_str.lower():
-                logger.error(f"  ❌ 모델 없음 ({model_name})")
-            elif 'response_mime_type' in error_str:
+                self._mark_hard_fail('할당량 초과')
+            elif '403' in error_str or 'permission' in lower:
+                self._mark_hard_fail('권한 없음')
+            elif '404' in error_str or 'not found' in lower:
+                self._mark_hard_fail('모델 없음')
+            elif '401' in error_str or 'api key' in lower:
+                self._mark_hard_fail('인증 실패')
+
+            if self.last_error_hard:
+                logger.error(f"  ❌ {self.last_error_reason} ({model_name}): {error_str[:200]}")
+                return None
+
+            if 'response_mime_type' in error_str:
                 logger.warning(f"  ⚠️ JSON 모드 미지원 ({model_name}), 텍스트 모드로 전환")
                 if use_json_mode:
                     return self._call_gemini(prompt, model_name, use_json_mode=False)
-            elif 'thinking_config' in error_str or 'thinking_budget' in error_str:
-                logger.warning(f"  ⚠️ thinking_config 미지원, 제거 후 재시도")
+            elif ('thinking_config' in error_str or 'thinking_budget' in error_str
+                  or 'thinking_level' in error_str):
+                logger.warning(f"  ⚠️ thinking 설정 미지원, 제거 후 재시도")
                 return self._call_gemini_simple(prompt, model_name, use_json_mode)
             else:
                 logger.error(f"  ❌ API 오류 ({model_name}): {error_str[:200]}")
-            
+
             return None
-    
+
     def _call_gemini_simple(self, prompt, model_name, use_json_mode=True):
         """최소 설정으로 호출 (thinking_config 없이)"""
+        self.last_error_hard = False
+        self.last_error_reason = ''
         try:
             gen_config = {
-                'temperature': self.temperature,
                 'max_output_tokens': self.max_tokens,
             }
             if use_json_mode:
                 gen_config['response_mime_type'] = 'application/json'
-            
+
             model = genai.GenerativeModel(model_name, generation_config=gen_config)
             response = self._generate_content(model, prompt)
-            
+
             if response and response.text:
                 logger.info(f"  ✅ 심플 모드 응답: {len(response.text)}자")
                 return response.text
             return None
-            
+
         except Exception as e:
-            if 'response_mime_type' in str(e) and use_json_mode:
+            error_str = str(e)
+            if 'response_mime_type' in error_str and use_json_mode:
                 return self._call_gemini_simple(prompt, model_name, use_json_mode=False)
-            logger.error(f"  ❌ 심플 모드도 실패: {e}")
+            if '429' in error_str:
+                self._mark_hard_fail('할당량 초과')
+            elif '403' in error_str:
+                self._mark_hard_fail('권한 없음')
+            logger.error(f"  ❌ 심플 모드도 실패: {error_str[:200]}")
             return None
     
     # ─── 해시태그 정제 ───
@@ -814,21 +867,32 @@ SNS 캡션 규칙:
         
         result = None
         max_dedup_attempts = 3  # 중복 시 최대 재시도
-        
+        started_at = time.monotonic()  # 전체 시도 예산 기준
+
         for dedup_attempt in range(max_dedup_attempts):
             if dedup_attempt > 0:
                 logger.info(f"  🔄 중복 감지, 동일 소재로 재작성 시도: '{forced_topic}' (시도 {dedup_attempt+1})")
-            
+
             for model_name in models:
+                if self._budget_exceeded(started_at):
+                    logger.error(f"⏱ 전체 시도 예산 {self.max_total_seconds}초 초과 → 모델 시도 중단")
+                    break
+
                 logger.info(f"\n{'─'*50}")
                 logger.info(f"📡 모델: {model_name}")
                 logger.info(f"{'─'*50}")
-                
+
+                model_hard_fail = False
+
                 for attempt in range(self.retry_count):
+                    if self._budget_exceeded(started_at):
+                        logger.error(f"⏱ 전체 시도 예산 {self.max_total_seconds}초 초과 → 중단")
+                        break
+
                     logger.info(f"[시도 {attempt+1}/{self.retry_count}] JSON 모드")
-                    
+
                     raw = self._call_gemini(prompt, model_name, use_json_mode=True)
-                    
+
                     if raw:
                         parsed = safe_json_loads(raw)
                         if parsed and self._validate_script(parsed):
@@ -836,27 +900,40 @@ SNS 캡션 규칙:
                             break
                         else:
                             logger.warning(f"  파싱/검증 실패 (응답 {len(raw)}자)")
-                    
+                    elif self.last_error_hard:
+                        # 401/403/404/429: 같은 모델 재시도는 시간 낭비 → 다음 모델로
+                        logger.warning(f"  ⛔ {self.last_error_reason} → 재시도 없이 다음 모델로")
+                        model_hard_fail = True
+                        break
+
                     if attempt < self.retry_count - 1:
                         delay = self.config.get('gemini', 'retry_delay', default=10)
                         logger.info(f"  {delay}초 대기...")
                         time.sleep(delay)
-                
+
                 if result:
                     break
-                
+                if model_hard_fail:
+                    time.sleep(1)
+                    continue
+                if self._budget_exceeded(started_at):
+                    break
+
                 logger.info(f"[텍스트 모드] 재시도")
                 raw = self._call_gemini(prompt, model_name, use_json_mode=False)
-                
+
                 if raw:
                     parsed = safe_json_loads(raw)
                     if parsed and self._validate_script(parsed):
                         result = parsed
                         break
-                
+                    logger.warning(f"  파싱/검증 실패 (텍스트 응답 {len(raw)}자)")
+                elif self.last_error_hard:
+                    logger.warning(f"  ⛔ {self.last_error_reason} → 다음 모델로")
+
                 logger.warning(f"  모델 {model_name} 실패, 다음 모델로...")
                 time.sleep(3)
-            
+
             if result:
                 # 🆕 v6.5: 제목 중복 체크
                 if self._is_duplicate_title(result, category_id):
@@ -864,9 +941,10 @@ SNS 캡션 규칙:
                     result = None  # 재생성
                     continue
                 break  # 중복 아니면 완료
-        
+
         if not result:
-            logger.error("❌ 모든 모델에서 실패!")
+            elapsed = int(time.monotonic() - started_at)
+            logger.error(f"❌ 모든 모델에서 실패! (총 {elapsed}초 소요)")
             raise Exception("스크립트 생성 실패: 사용 가능한 모델 없음")
         
         # 순차 정보와 썸네일 훅 강제 삽입 (검증 실패 시 기획안 문구로 폴백)

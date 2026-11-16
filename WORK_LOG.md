@@ -4,6 +4,17 @@
 
 ---
 
+## 2026-11-16 — Gemini 4 Hydrogen 전환 + 무료 모델 조회 도구 + 시도 예산
+
+- 배경(사용자 요청·모델 목록 확인): `gemini-4-hydrogen`(2026-11 공개, 무료 티어) 확인. 기존 폴백 1순위 `gemini-3.7-flash`는 무료 티어 여부가 확인되지 않아(`?`) 무료 키에서 429/403만 유발. 4 시리즈는 `temperature` 미지원, `thinking_budget` 대신 `thinking_level`, thinking 토큰이 `max_output_tokens` 캡에 포함된다는 API 차이 존재.
+- 수정1(`scripts/list_gemini_models.py` 신규): 실행 중 키를 직접 입력받아(`--key`/`--env` 지원) `models.list`로 사용 가능 모델 조회. 무료 여부는 공식 가격문서(2026-11-16) 기준 표기(O/X/제한/?), `--verify` 시 `countTokens`로 접근 확인. 키는 헤더 전달·화면 마스킹.
+- 수정2(`config/config.yml`): 주력 `gemini-4-hydrogen`, 폴백 `3.8-flash → 3.6-flash → 3.5-flash-lite`(총 4개)로 축소. `thinking_level: low`, `max_output_tokens` 8192→16384, `max_total_seconds: 900` 신설, 미사용 `temperature` 제거. 3.1-flash-lite·preview·`-latest`·gemma·4-argon/carbon은 제외(무료 미확인/유료/재현성).
+- 수정3(`script_generator.py`): `is_gemini4_model()` 추가, 4 시리즈에만 `thinking_config={'thinking_level': ...}` 전송, temperature 전송 제거, 2.5 계열은 기존 `thinking_budget` 유지. 401/403/404/429는 하드 실패로 분류해 같은 모델 재시도 없이 다음 모델로 이동, 전체 시도 예산 초과 시 즉시 중단.
+- 검증: `py_compile` 2개 통과, Mock 오프라인 테스트 2종(파라미터·오류 분류·폴백·예산 39항목 + 루프 동작 8항목) 전부 PASS. 실제 API 호출 없음.
+- 후속: `manual-trigger.yml` 수동 1회 실행으로 실전 확인 필요(주력 성공 여부·폴백 횟수·총 소요시간).
+
+---
+
 ## 2026-11-07 — Gemini 요청 타임아웃 추가 (504 Deadline Exceeded 장시간 대기 해소)
 
 - 배경(사용자 제보·실행 로그): `gemini-3.8-flash` 호출이 `22:12:23 → 22:22:23` 정확히 600초 후 `504 Deadline Exceeded`. `generate_content`에 타임아웃을 지정하지 않아 SDK 기본값(600초)까지 대기했고, 모델별 재시도 2회 + 텍스트 모드 재시도까지 반복되어 주력 모델 하나에서 최대 30~40분을 소모한 뒤에야 폴백.
